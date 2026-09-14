@@ -69,10 +69,7 @@ const ForgotPassword = () => {
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        let baseUrl = window.location.origin;
-        if (baseUrl === "http://localhost:3000") {
-          baseUrl = "https://crm.saleofast.com"
-        }
+        let baseUrl = "http://18.61.246.105";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

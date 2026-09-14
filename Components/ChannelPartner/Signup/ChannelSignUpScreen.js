@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { fetchData } from "../../../Utils/getReq";
 import Select from "react-select";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
@@ -12,7 +11,8 @@ import Loader from "../../Loader/Loader";
 
 
 const ChannelSignUpScreen = () => {
-  const CP_LEAD_STATUS_URL = "https://admin.theprosperity.in/api/v1/db/channelPartnerLeads/";
+  // const CP_LEAD_STATUS_URL = "https://admin.theprosperity.in/api/v1/db/channelPartnerLeads/";
+  const CP_LEAD_STATUS_URL = `${Baseurl}/db/channelPartnerLeads/`;
   const [formFields, setFormFields] = useState({
     id: "",
     cpl_id: "",
@@ -37,7 +37,6 @@ const ChannelSignUpScreen = () => {
   });
   const [statelist, setStatelist] = useState([]);
   const [citylist, setCitylist] = useState([]);
-  const [errorToast, setErrorToast] = useState(false);
   const [clientData, setClientData] = useState();
   const { isButtonLoading } = useSelector((state) => state.buttonLoader)
   const dispatch = useDispatch()
@@ -239,7 +238,8 @@ const ChannelSignUpScreen = () => {
 
       // If token verification doesn't return cpl_id, fetch it using user_id/email/mobile.
       if (!leadId) {
-        const localBase = "https://admin.theprosperity.in/api/v1";
+        // const localBase = "https://admin.theprosperity.in/api/v1";
+        const localBase = Baseurl;
         const listUrl = `${localBase}/db/channelPartnerLeads?db_name=${encodeURIComponent(dbName)}`;
 
         const headersForList = {
@@ -383,25 +383,108 @@ const ChannelSignUpScreen = () => {
     }
   };
 
+  // Only states enabled in Settings → State master
   const getState = async () => {
-    const id = 101;
-    await fetchData(
-      `/db/admin/state?cnt_id=${id}`,
-      setStatelist,
-      errorToast,
-      setErrorToast,
-      true
-    );
+    try {
+      const token = getCookie("token");
+      const db_name = getCookie("db_name");
+      const header = token
+        ? {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+              db: db_name,
+              pass: "pass",
+            },
+          }
+        : { headers: { Accept: "application/json" } };
+
+      const response = await axios.get(
+        `${Baseurl}/db/admin/state/available?country_id=101`,
+        header
+      );
+
+      let states = [];
+      if (Array.isArray(response.data?.data)) {
+        states = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        states = response.data;
+      }
+
+      const enabledStates = states.filter(
+        (state) =>
+          state.is_available === true ||
+          state.is_available === 1 ||
+          state.is_active === true ||
+          state.is_active === 1 ||
+          state.is_enabled === true ||
+          state.is_enabled === 1
+      );
+
+      setStatelist(enabledStates);
+    } catch (error) {
+      console.error("Error fetching states:", error);
+      setStatelist([]);
+      toast.error("Failed to load states. Please refresh the page.", { autoClose: 2500 });
+    }
   };
 
+  // Only cities enabled in Settings → City master for selected state
   const getcity = async (id) => {
-    await fetchData(
-      `/db/admin/city?st_id=${id}`,
-      (data) => setCitylist(data.cityData),
-      errorToast,
-      setErrorToast,
-      true
-    );
+    if (!id) {
+      setCitylist([]);
+      return;
+    }
+
+    try {
+      const token = getCookie("token");
+      const db_name = getCookie("db_name");
+      const header = token
+        ? {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+              db: db_name,
+              pass: "pass",
+            },
+          }
+        : { headers: { Accept: "application/json" } };
+
+      const response = await axios.get(
+        `${Baseurl}/db/area/city/active?state_id=${id}`,
+        header
+      );
+
+      const responseData = response.data?.data;
+      let cities = [];
+      if (Array.isArray(responseData)) {
+        cities = responseData;
+      } else if (Array.isArray(responseData?.cityData)) {
+        cities = responseData.cityData;
+      } else if (Array.isArray(response.data)) {
+        cities = response.data;
+      }
+
+      const enabledCities = cities.filter(
+        (city) =>
+          city.is_available === true ||
+          city.is_available === 1 ||
+          city.is_active === true ||
+          city.is_active === 1 ||
+          city.is_enabled === true ||
+          city.is_enabled === 1 ||
+          // active endpoint may already return only enabled cities
+          (city.is_available === undefined &&
+            city.is_active === undefined &&
+            city.is_enabled === undefined)
+      );
+
+      setCitylist(enabledCities);
+    } catch (error) {
+      console.error("Error fetching cities:", error);
+      setCitylist([]);
+      toast.error("Failed to load cities for selected state.", { autoClose: 2500 });
+    }
   };
 
   const handleFileChange = (event, field) => {
@@ -426,13 +509,15 @@ const ChannelSignUpScreen = () => {
   useEffect(() => {
     if (formFields.state_id) {
       getcity(formFields.state_id);
+    } else {
+      setCitylist([]);
     }
   }, [formFields.state_id]);
 
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        const baseUrl = window.location.origin;
+        const baseUrl = "http://18.61.246.105";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

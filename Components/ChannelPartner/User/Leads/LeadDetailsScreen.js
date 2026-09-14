@@ -131,7 +131,7 @@ const LeadDetailsScreen = () => {
   const editLead =  async(e) => {
   e.preventDefault();
      if (!hasCookie("token")) return;
-     const token = getCookie("token");
+     const token = getCookie("token");  
      const db_name = getCookie("db_name");
      const header = {
        headers: {

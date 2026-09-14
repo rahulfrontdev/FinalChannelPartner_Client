@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { Button, Modal } from 'react-bootstrap';
 import Select from 'react-select';
 import axios from 'axios';
-import { Baseurl } from '../../../../Utils/Constants';
+import { Baseurl, isRmRole, isBstRole } from '../../../../Utils/Constants';
 import { getCookie, hasCookie, setCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
 import DateRange from '../../../DateRangeCustom/Daterange';
@@ -13,10 +13,13 @@ import Loader from '../../../Loader/Loader';
 import { Form } from 'react-bootstrap';
 import { fetchData } from '../../../../Utils/getReq';
 import * as XLSX from "xlsx";
+import DeleteIcon from "../../../Svg/DeleteIcon";
+import EditIcon from "../../../Svg/EditIcon";
+import ViewIcon from "../../../Svg/ViewIcon";
 
 
 
-const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo, setoldAssignTo, setShowDateFilter, usersList, getDataList, loader, selectedOption, setSelectedOption, channelPartnerFilter }) => {
+const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo, setoldAssignTo, oldAssignToRm, setoldAssignToRm, setShowDateFilter, usersList, getDataList, loader, selectedOption, setSelectedOption, channelPartnerFilter }) => {
   const router = useRouter()
   const [data, setData] = useState([])
   const [userData, setUserData] = useState([])
@@ -50,25 +53,80 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     getPartnerTypes()
   }, [])
 
+  const mapUserOption = (data) => ({
+    value: data?.user_id,
+    label: (
+      <>
+        {data?.user ?? ""}{" "}
+        {data?.user_status ? (
+          <span className="status_box  text-center">
+            <span className="active status_btn">active</span>
+          </span>
+        ) : (
+          <span className="status_box  text-center">
+            <span className="inactive status_btn">inactive</span>
+          </span>
+        )}
+      </>
+    ),
+  });
+
+  const getBstUserOptions = () => [
+    { value: userInfo?.user_id, label: "N.A" },
+    ...(usersList?.filter(user => isBstRole(user.role_id))?.map(mapUserOption) || []),
+  ];
+
+  const getRmUserOptions = () => [
+    { value: userInfo?.user_id, label: "N.A" },
+    ...(usersList?.filter(user => isRmRole(user.role_id))?.map(mapUserOption) || []),
+  ];
+
   const userListFilterBasisOfRole = (selectedOption, usersList) => {
-    if (selectedOption === "Channel Partner") {
-      return [{ value: userInfo?.user_id, label: "N.A" }, ...usersList
-        ?.filter(user => user.role_id === 2 || user.role_id === 3)
-        ?.map(data => ({
-          value: data?.user_id,
-          label: data?.user,
-        }))];
-    }
     if (selectedOption === "BST") {
       return [{ value: userInfo?.user_id, label: "N.A" }, ...usersList
         ?.filter(user => user.role_id === 3)
-        ?.map(data => ({
-          value: data?.user_id,
-          label: data?.user,
-        }))];
+        ?.map(mapUserOption)];
     }
-    // If no match, return an empty array
     return [];
+  };
+
+  const getSelectValue = (assignId) => {
+    if (assignId === "" || assignId == null) return null;
+    if (assignId === userInfo?.user_id) {
+      return { value: userInfo?.user_id, label: "N.A" };
+    }
+    const user = usersList?.find(u => u.user_id === assignId);
+    return user ? mapUserOption(user) : null;
+  };
+
+  const userSearchFilterOption = (option, inputValue) => {
+    if (!inputValue) return true;
+    const user = usersList?.find(u => u.user_id === option.value);
+    if (!user) return option.label?.toString()?.toLowerCase()?.includes(inputValue.toLowerCase());
+    const searchTerm = inputValue.toLowerCase();
+    return (
+      user.user?.toLowerCase().includes(searchTerm) ||
+      user.email?.toLowerCase().includes(searchTerm) ||
+      String(user.contact_number || "").includes(searchTerm)
+    );
+  };
+
+  const setAssignPrefill = (assignedId) => {
+    const id = assignedId ?? "";
+    const assignedUser = usersList?.find(u => u.user_id === id);
+    if (isRmRole(assignedUser?.role_id)) {
+      setoldAssignToRm?.(id);
+      setoldAssignTo?.("");
+    } else {
+      setoldAssignTo?.(id);
+      setoldAssignToRm?.("");
+    }
+  };
+
+  const getSelectedAssignTo = () => {
+    if (oldAssignTo !== "" && oldAssignTo != null) return oldAssignTo;
+    if (oldAssignToRm !== "" && oldAssignToRm != null) return oldAssignToRm;
+    return null;
   };
 
   const columns = [
@@ -206,7 +264,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       }
     },
     {
-      name: 'onboarding_date',
+      name: 'createdAt',
       label: "Created Date",
       options: {
         filter: false,
@@ -216,8 +274,21 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
           </th>
         ),
         customBodyRender: (value, tableMeta, updateValue) => {
-
+          if (!value) {
+            return (
+              <div className='status_box text-center' style={{ color: "#667799" }}>
+                ---------
+              </div>
+            )
+          }
           const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            return (
+              <div className='status_box text-center' style={{ color: "#667799" }}>
+                ---------
+              </div>
+            )
+          }
           const day = String(date.getDate()).padStart(2, '0');
           const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
           const year = date.getFullYear();
@@ -396,7 +467,6 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         download: false,
         viewColumns: false,
         display: (userInfo?.role_id == null || userInfo?.role_id == 3) && (selectedOption == "Channel Partner" || (selectedOption == "BST" && userInfo?.role_id == null)) ? true : false,
-        // display:(userInfo?.role_id==null || userInfo?.role_id==3 ) && (selectedOption=="Channel Partner") ? true:false,
         customHeadRender: (columnMeta, updateDirection) => (
           <th className="text-center" style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: 'white', paddingLeft: "15px" }}   >
             {columnMeta.label}
@@ -406,7 +476,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
           return (
             <div className="table_btns justify-content-center align-items-center">
               <button
-                onClick={() => { setShowAssignTo(value); setoldAssignTo(tableMeta?.tableData[tableMeta?.rowIndex][11] ?? "") }}
+                onClick={() => { setShowAssignTo(value); setAssignPrefill(tableMeta?.tableData[tableMeta?.rowIndex][11] ?? "") }}
                 style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
                 className='pe-3 ps-3'
                 title='Assign - To'>
@@ -583,7 +653,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
 
       if (cell == null || cell === '') continue;
 
-      if (colName === 'onboarding_date') {
+      if (colName === 'createdAt') {
         if (matchDateSearch(cell, searchQuery)) return true;
         continue;
       }
@@ -691,6 +761,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
 
   const updateUserHandler = async () => {
     let toastShown = false;
+    const assignTo = getSelectedAssignTo();
     for (const element of userData) {
       if (!hasCookie("token")) return;
 
@@ -710,7 +781,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         const response = await axios.put(`${Baseurl}/db/users`, {
           db_name: db_name,
           user_code: element,
-          report_to: oldAssignTo,
+          report_to: assignTo,
           isAssigned: true
         }, header);
 
@@ -720,6 +791,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             toastShown = true;
           }
           setoldAssignTo('');
+          setoldAssignToRm?.('');
           setShowModal(false);
           setUserData([])
           if (channelPartnerFilter) {
@@ -805,86 +877,110 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       }
 
 
-      <Modal className="commonModal" show={showModal} onHide={() => { setShowModal(false) }} style={{}}>
+      <Modal className="commonModal" show={showModal} onHide={() => { setShowModal(false); setoldAssignTo(''); setoldAssignToRm?.(''); }} style={{}}>
         <Modal.Header closeButton>
           <Modal.Title>  Assign To </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="add_user_form">
             <div className="row">
-              <div className="col-xl-12 col-md-12 col-sm-12 col-12">
-                <div className="input_box">
-                  <label className="form-label">Assign To</label>
-                  <Select
-                    id="select"
-                    defaultValue={""}
-                    isSearchable={true}
-                    isClearable={true}
-                    placeholder="Search and select user..."
-                    noOptionsMessage={() => "No users found"}
-                    filterOption={(option, inputValue) => {
-                      if (!inputValue) return true;
-                      const user = usersList?.find(u => u.user_id === option.value);
-                      if (!user) return false;
-                      const searchTerm = inputValue.toLowerCase();
-                      return (
-                        user.user?.toLowerCase().includes(searchTerm) ||
-                        user.email?.toLowerCase().includes(searchTerm) ||
-                        String(user.contact_number || "").includes(searchTerm)
-                      );
-                    }}
-                    // options={[{ value: null, label: "N.A" },...usersList?.filter(user => (user.role_id === 2||user.role_id === 3)).map((data) => {
-                    //     return {
-                    //         value: data?.user_id,
-                    //         label: data?.user,
-                    //     };
-                    // })]}
-                    options={userListFilterBasisOfRole(selectedOption, usersList)}
-                    value={usersList?.map((data, index) => {
-                      if (oldAssignTo === data.user_id) {
-                        return {
-                          value: data?.user_id,
-                          label: (
-                            <>
-                              {data?.user ?? ""}{" "}
-                              {data?.user_status ? (
-                                <span className="status_box  text-center">
-                                  <span className="active status_btn">active</span>
-                                </span>
-                              ) : (
-                                <span className="status_box  text-center">
-                                  <span className="inactive status_btn">inactive</span>
-                                </span>
-                              )}
-                            </>
-                          ),
-                        };
-                      }
-                    })}
-                    onChange={(e) => {
-                      setoldAssignTo(e?.value || "")
-
-                    }}
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        minHeight: '38px',
-                      }),
-                      menu: (base) => ({
-                        ...base,
-                        zIndex: 9999,
-                      }),
-                    }}
-                  />
-
-
+              {selectedOption === "Channel Partner" ? (
+                <>
+                  <div className="col-xl-12 col-md-12 col-sm-12 col-12">
+                    <div className="input_box">
+                      <label className="form-label">Assign To (BST)</label>
+                      <Select
+                        id="select-bst"
+                        isSearchable={true}
+                        isClearable={true}
+                        placeholder="Search and select BST user..."
+                        noOptionsMessage={() => "No BST users found"}
+                        filterOption={userSearchFilterOption}
+                        options={getBstUserOptions()}
+                        value={getSelectValue(oldAssignTo)}
+                        onChange={(e) => {
+                          setoldAssignTo(e?.value || "")
+                          if (e?.value) setoldAssignToRm?.("")
+                        }}
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: '38px',
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            zIndex: 9999,
+                          }),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
+                    <div className="input_box">
+                      <label className="form-label">Assign To (RM)</label>
+                      <Select
+                        id="select-rm"
+                        isSearchable={true}
+                        isClearable={true}
+                        placeholder="Search and select RM user..."
+                        noOptionsMessage={() => "No RM users found"}
+                        filterOption={userSearchFilterOption}
+                        options={getRmUserOptions()}
+                        value={getSelectValue(oldAssignToRm)}
+                        onChange={(e) => {
+                          setoldAssignToRm?.(e?.value || "")
+                          if (e?.value) setoldAssignTo?.("")
+                        }}
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: '38px',
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            zIndex: 9999,
+                          }),
+                        }}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="col-xl-12 col-md-12 col-sm-12 col-12">
+                  <div className="input_box">
+                    <label className="form-label">Assign To</label>
+                    <Select
+                      id="select"
+                      defaultValue={""}
+                      isSearchable={true}
+                      isClearable={true}
+                      placeholder="Search and select user..."
+                      noOptionsMessage={() => "No users found"}
+                      filterOption={userSearchFilterOption}
+                      options={userListFilterBasisOfRole(selectedOption, usersList)}
+                      value={getSelectValue(oldAssignTo)}
+                      onChange={(e) => {
+                        setoldAssignTo(e?.value || "")
+                      }}
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: '38px',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          zIndex: 9999,
+                        }),
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </Modal.Body>
         <Modal.Footer>
-          <button className=" btn btn-danger rounded-5" onClick={() => setShowModal(false)}>Cancel</button>
+          <button className=" btn btn-danger rounded-5" onClick={() => { setShowModal(false); setoldAssignTo(''); setoldAssignToRm?.(''); }}>Cancel</button>
           <button style={{ background: clientBtnColor }} className='btn rounded-5 text-white' onClick={updateUserHandler} >
             Submit
           </button>

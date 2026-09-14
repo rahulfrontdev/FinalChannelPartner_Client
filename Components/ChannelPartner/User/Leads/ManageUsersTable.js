@@ -992,7 +992,7 @@ const getVisitInfo=async(visitId)=>{
                                         value={p_visit_time}
                                         onChange={(e)=>{
                                             setVisitTime(e.target.value)
-                                        }}
+                                        }}  
                                         name="name"
                                         className="input-field"
                                         required

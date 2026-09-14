@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import { useRouter } from "next/router";
 import DashLeadsCard from './DashLeadsCard'
-import { Baseurl, filesUrl } from '../../../../Utils/Constants';
+import { Baseurl, filesUrl, isRmRole } from '../../../../Utils/Constants';
 import moment from 'moment';
 import { useSelector } from 'react-redux';
 import ReChart from './ReChart';
@@ -352,6 +352,7 @@ const DashboardUser = () => {
                                             {
                                                 userInfoCheck?.role_id !== 2 && (
                                                 <div className="row leads_row addgap">
+                                                    {!isRmRole(userInfoCheck?.role_id) && (
                                                     <div className="col-xl-3 col-md-3 col-12 col-sm-12">
                                                         <Link href={`/partner/Leads`} onClick={() => {
                                                             const queryObjLeads = {
@@ -370,6 +371,7 @@ const DashboardUser = () => {
                                                         </Link>
 
                                                     </div>
+                                                    )}
                                                     <div className="col-xl-3 col-md-3 col-12 col-sm-12">
                                                         <Link href={"/partner/Visits"} onClick={() => {
                                                             const queryObjLeads = {
@@ -389,6 +391,8 @@ const DashboardUser = () => {
                                                         </Link>
 
                                                     </div>
+                                                    {!isRmRole(userInfoCheck?.role_id) && (
+                                                    <>
                                                     <div className="col-xl-3 col-md-3 col-12 col-sm-12">
                                                         <Link href={"/partner/Bookings"} onClick={() => {
                                                             const queryObjLeads = {
@@ -419,6 +423,8 @@ const DashboardUser = () => {
                                                             color='#03850d'
                                                             icon={TimelapseIcon} />
                                                     </div>
+                                                    </>
+                                                    )}
                                                 </div>
                                                 )
                                             }
@@ -427,6 +433,8 @@ const DashboardUser = () => {
                                                 <>
                                                     <label className='m-3 fw-bold' style={{ fontSize: "24px", color: "#160354" }}>CP LEADS</label>
                                                     <div className="row leads_row addgap">
+                                                        {!isRmRole(userInfoCheck?.role_id) && (
+                                                        <>
                                                         <div className="col-xl-3 col-md-3 col-12 col-sm-12">
                                                             <Link href={"/partner/CPRegisterLeads?status_id=OPEN"} onClick={() => {
                                                                 const queryObjLeads = {
@@ -502,6 +510,8 @@ const DashboardUser = () => {
                                                                 />
                                                             </Link>
                                                         </div>
+                                                        </>
+                                                        )}
 
                                                         <div className="col-xl-3 col-md-3 col-12 col-sm-12">
                                                             <Link href={"/partner/CPRegisterLeads?status_id=ONBOARDED"} onClick={() => {
@@ -540,6 +550,7 @@ const DashboardUser = () => {
                                                                 />
                                                             </Link>
                                                         </div>
+                                                        {!isRmRole(userInfoCheck?.role_id) && (
                                                         <div className="col-xl-3 col-md-3 col-12 col-sm-12">
                                                             <Link href={"/partner/CPRegisterLeads?status_id=FOLLOW UP"} onClick={() => {
                                                                 const queryObjLeads = {
@@ -558,6 +569,7 @@ const DashboardUser = () => {
                                                                 />
                                                             </Link>
                                                         </div>
+                                                        )}
                                                     </div>
                                                 </>
                                                 // )

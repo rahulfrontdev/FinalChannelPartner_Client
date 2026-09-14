@@ -168,7 +168,7 @@ const CPRegisterLeadsScreen = () => {
         console.log("response ", response.data.data)
         if (response?.status === 200 || response?.status === 201) {
           setLoader(false);
-          setDataList(response.data.data);
+          setDataList(response?.data?.data?.leads || []);
         }
       } catch (error) {
         if (error?.response?.data?.message) {

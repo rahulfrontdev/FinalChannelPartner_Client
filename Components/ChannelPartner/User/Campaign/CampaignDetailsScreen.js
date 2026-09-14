@@ -24,6 +24,8 @@ const CampaignDetailsScreen = () => {
   const clientBtnColor = hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#293790";
   const clientLogo = getCookie('clientLogo') ? JSON.parse(getCookie('clientLogo')) : null;
   const userInfo = hasCookie("userInfo") ? JSON.parse(getCookie("userInfo")) : null;
+  // RERA Number is only for Channel Partner profile (role_id 1), not BST
+  const isCpProfile = Number(userInfo?.role_id) === 1;
   
   const dispatch = useDispatch();
   const { isButtonLoading } = useSelector((state) => state.buttonLoader);
@@ -119,7 +121,7 @@ const CampaignDetailsScreen = () => {
   // Download PDF function
   const downloadPdf = async () => {
     const reraNumber = projectData?.rera_number?.toString().trim();
-    if (!reraNumber) {
+    if (isCpProfile && !reraNumber) {
       toast.warning("Please enter and save RERA Number before downloading PDF", { autoClose: 3000 });
       return;
     }
@@ -209,16 +211,18 @@ const CampaignDetailsScreen = () => {
         heightLeft -= contentHeight;
       }
 
-      // Add RERA footer on the last page (always visible)
-      const totalPages = pdf.internal.getNumberOfPages();
-      pdf.setPage(totalPages);
-      pdf.setDrawColor(224, 224, 224);
-      pdf.line(10, pageHeight - footerHeight, pageWidth - 10, pageHeight - footerHeight);
-      pdf.setFontSize(11);
-      pdf.setTextColor(51, 51, 51);
-      const footerText = `RERA Number: ${reraNumber}`;
-      const textWidth = pdf.getTextWidth(footerText);
-      pdf.text(footerText, (pageWidth - textWidth) / 2, pageHeight - 6);
+      // Add RERA footer on the last page (CP profile only)
+      if (isCpProfile && reraNumber) {
+        const totalPages = pdf.internal.getNumberOfPages();
+        pdf.setPage(totalPages);
+        pdf.setDrawColor(224, 224, 224);
+        pdf.line(10, pageHeight - footerHeight, pageWidth - 10, pageHeight - footerHeight);
+        pdf.setFontSize(11);
+        pdf.setTextColor(51, 51, 51);
+        const footerText = `RERA Number: ${reraNumber}`;
+        const textWidth = pdf.getTextWidth(footerText);
+        pdf.text(footerText, (pageWidth - textWidth) / 2, pageHeight - 6);
+      }
 
       pdf.save(`${projectData?.project || 'Campaign'}-Template.pdf`);
       toast.success('PDF downloaded successfully!', { autoClose: 2500 });
@@ -231,7 +235,7 @@ const CampaignDetailsScreen = () => {
   };
 
   const updateProject = async () => {
-    if (!projectData?.rera_number?.toString().trim()) {
+    if (isCpProfile && !projectData?.rera_number?.toString().trim()) {
       return toast.warning("Please enter RERA Number", { autoClose: 2500 });
     }
     const contactNo = projectData?.contact_no?.toString().trim();
@@ -442,10 +446,12 @@ const CampaignDetailsScreen = () => {
                   <span style={{ color: "#6c757d", fontWeight: "600", width: "150px" }}>Property Name:</span>
                   <span style={{ color: clientBtnColor, fontWeight: "600" }}>{projectData?.project || "N/A"}</span>
                 </div>
-                <div style={{ display: "flex", marginBottom: "15px" }}>
-                  <span style={{ color: "#6c757d", fontWeight: "600", width: "150px" }}>RERA Number:</span>
-                  <span style={{ color: "#333", fontWeight: "600" }}>{projectData?.rera_number || "N/A"}</span>
-                </div>
+                {isCpProfile && (
+                  <div style={{ display: "flex", marginBottom: "15px" }}>
+                    <span style={{ color: "#6c757d", fontWeight: "600", width: "150px" }}>RERA Number:</span>
+                    <span style={{ color: "#333", fontWeight: "600" }}>{projectData?.rera_number || "N/A"}</span>
+                  </div>
+                )}
                 {projectData?.location && (
                   <div style={{ display: "flex", marginBottom: "15px" }}>
                     <span style={{ color: "#6c757d", fontWeight: "600", width: "150px" }}>Location:</span>
@@ -485,7 +491,7 @@ const CampaignDetailsScreen = () => {
               borderRadius: "8px"
             }}>
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-                {projectData?.rera_number && (
+                {isCpProfile && projectData?.rera_number && (
                   <p style={{ margin: 0, fontSize: "14px" }}><strong>RERA Number:</strong> {projectData.rera_number}</p>
                 )}
               </div>
@@ -530,17 +536,19 @@ const CampaignDetailsScreen = () => {
                     className="w-73 border p-2 rounded-md text-black"
                   />
                 </div>
-                <div className="w-50 d-flex justify-content-lg-between align-items-center">
-                  <label className="w-27" style={{ color: "#9C9AA5" }}>RERA Number*</label>
-                  <input
-                    type="text"
-                    value={projectData?.rera_number}
-                    onChange={(e) => setProjectData({ ...projectData, rera_number: e.target.value })}
-                    placeholder="Enter RERA Number"
-                    style={{ outline: "none" }}
-                    className="w-73 border p-2 rounded-md text-black"
-                  />
-                </div>
+                {isCpProfile && (
+                  <div className="w-50 d-flex justify-content-lg-between align-items-center">
+                    <label className="w-27" style={{ color: "#9C9AA5" }}>RERA Number*</label>
+                    <input
+                      type="text"
+                      value={projectData?.rera_number}
+                      onChange={(e) => setProjectData({ ...projectData, rera_number: e.target.value })}
+                      placeholder="Enter RERA Number"
+                      style={{ outline: "none" }}
+                      className="w-73 border p-2 rounded-md text-black"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="d-flex justify-content-between gap-5 align-items-center">

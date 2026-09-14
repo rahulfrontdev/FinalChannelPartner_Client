@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React, { useEffect, useRef, useState } from "react";
-import { Baseurl, filesUrl } from "../../../../Utils/Constants";
+import { Baseurl, filesUrl, isRmRole } from "../../../../Utils/Constants";
 import { deleteCookie, getCookie, hasCookie, removeCookies, setCookie } from "cookies-next";
 import { Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -316,21 +316,7 @@ const CP_NavBar = () => {
                       </Link>
                     </li>
                     
-                    <li className="nav-item" onClick={onRefCall}>
-                      <Link
-                        className={`nav-link ${isActive(
-                          "/partner/Visits"
-                        )}`}
-                        href="/partner/Visits"
-                        onClick={() => {
-                          router.pathname == "/partner/Visits" || router.pathname == "/partner/VisitDetails" ? "" : deleteCookieOnRouteChange()
-                          dispatch(setActiveLink("/partner/Visits"))
-                          setCookie("activeLink", "/partner/Visits")
-                        }}
-                      >
-                        Visits
-                      </Link>
-                    </li>
+                    
                     <li className="nav-item" onClick={onRefCall}>
                       <Link
                         className={`nav-link ${isActive(
@@ -365,6 +351,21 @@ const CP_NavBar = () => {
                     <li className="nav-item" onClick={onRefCall}>
                       <Link
                         className={`nav-link ${isActive(
+                          "/partner/Visits"
+                        )}`}
+                        href="/partner/Visits"
+                        onClick={() => {
+                          router.pathname == "/partner/Visits" || router.pathname == "/partner/VisitDetails" ? "" : deleteCookieOnRouteChange()
+                          dispatch(setActiveLink("/partner/Visits"))
+                          setCookie("activeLink", "/partner/Visits")
+                        }}
+                      >
+                        Visits
+                      </Link>
+                    </li>
+                    <li className="nav-item" onClick={onRefCall}>
+                      <Link
+                        className={`nav-link ${isActive(
                           "/partner/Campaign"
                         )}`}
                         href="/partner/Campaign"
@@ -375,6 +376,57 @@ const CP_NavBar = () => {
                         }}
                       >
                         Campaign
+                      </Link>
+                    </li>
+                  </>
+                )
+              }
+
+              {
+                isRmRole(roleId) && (
+                  <>
+                    {
+                      hasCookie("channel") && (
+                        <li className='nav-item cursor-pointer pt-2' onClick={() => {
+                          deleteCookieOnRouteChange()
+                          deleteCookie("channel")
+                          dispatch(clearValue())
+                          router.push("/")
+                          onRefCall()
+                        }}><img src='/switch.svg' style={{ width: "15px", marginTop: "4px" }} /></li>
+                      )
+                    }
+                    <li className="nav-item" onClick={onRefCall}>
+                      <Link className={`nav-link ${isActive('/partner')}`} href="/partner"
+                        onClick={() => {
+                          deleteCookieOnRouteChange()
+                          dispatch(setActiveLink("/partner"))
+                          setCookie("activeLink", "/partner")
+                        }}
+                      >Reports & Dashboard</Link>
+                    </li>
+                    <li className="nav-item" onClick={onRefCall}>
+                      <Link className={`nav-link ${isActive('/partner/ActivePartners')}`} href="/partner/ActivePartners"
+                        onClick={() => {
+                          router.pathname == "/partner/ChannelPartnersDetails" || router.pathname == "/partner/EditActiveUsers" || router.pathname == "/partner/ActivePartners" ? "" : deleteCookieOnRouteChange()
+                          dispatch(setActiveLink("/partner/ActivePartners"))
+                          setCookie("activeLink", "/partner/ActivePartners")
+                        }}
+                      >Channel Partners</Link>
+                    </li>
+                    <li className="nav-item" onClick={onRefCall}>
+                      <Link
+                        className={`nav-link ${isActive(
+                          "/partner/Visits"
+                        )}`}
+                        href="/partner/Visits"
+                        onClick={() => {
+                          router.pathname == "/partner/Visits" || router.pathname == "/partner/VisitDetails" ? "" : deleteCookieOnRouteChange()
+                          dispatch(setActiveLink("/partner/Visits"))
+                          setCookie("activeLink", "/partner/Visits")
+                        }}
+                      >
+                        Visits
                       </Link>
                     </li>
                   </>

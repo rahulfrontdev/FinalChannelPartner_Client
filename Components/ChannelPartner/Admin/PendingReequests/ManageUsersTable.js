@@ -89,7 +89,8 @@ const ManageUsersTable = ({
         const response = await axios.post(`${Baseurl}/db/users/resendEmailToPendingUser`,{
           email:email,
           user_id:id,
-          report_to:report_to 
+          report_to:report_to,
+          client_url: "http://18.61.246.105",
         }, header);
         if (response.status === 200 || response.status === 201) {
           toast.success(response?.data?.message,{autoClose:2500});

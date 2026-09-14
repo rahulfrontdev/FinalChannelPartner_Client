@@ -7,7 +7,7 @@ import { useRouter } from "next/router";
 import Loader from "../Components/Loader/Loader";
 import Link from "next/link";
 import { crm, dms, sales, channel, clearValue,media } from "../store/permissionSlice";
-import { Baseurl, filesUrl } from "../Utils/Constants";
+import { Baseurl, filesUrl, isRmRole } from "../Utils/Constants";
 import { toast } from "react-toastify";
 import axios from "axios";
 import moment from "moment";
@@ -300,7 +300,7 @@ export default mainIndexHOC(
                         )
                       }
                       {
-                        userInfo && userInfo?.role_id !==null && sidebarInfo[1]?.actions===1 &&  (
+                        userInfo && userInfo?.role_id !==null && !isRmRole(userInfo?.role_id) && sidebarInfo[1]?.actions===1 &&  (
                           <div
                           className="col-12 col-md-6 p-3 d-flex flex-column gap-2 align-items-center justify-content-end "
                           onClick={() => {

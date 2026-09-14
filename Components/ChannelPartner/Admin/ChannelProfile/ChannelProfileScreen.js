@@ -7,7 +7,7 @@ import { hasCookie, getCookie, setCookie, deleteCookie, removeCookies } from "co
 import { useRouter } from 'next/router';
 import { userLogOut } from "../../../../store/ClientLoginSlice";
 import { toast } from "react-toastify";
-import { Baseurl, filesUrl } from '../../../../Utils/Constants';
+import { Baseurl, filesUrl, isRmRole } from '../../../../Utils/Constants';
 import axios from 'axios';
 import Link from 'next/link';
 
@@ -136,10 +136,13 @@ const ChannelProfileScreen = () => {
                                                     }
                                                     {
                                                         userInfo?.role_id==2 && "BST"
-                                                    }
-                                                     {
+                                                        }
+                                                        {
                                                         userInfo?.role_id==3 && "Director"
-                                                    }
+                                                        }
+                                                        {
+                                                        isRmRole(userInfo?.role_id) && "RM"
+                                                        }
                                                     </span>
                                             </div>
                                             <div className="d-flex flex-column gap-3 person-data">

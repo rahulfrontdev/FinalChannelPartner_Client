@@ -3,6 +3,7 @@ import BasicRangeShortcuts from '../../DateRangeCustom/Daterange'
 import { getCookie, hasCookie } from 'cookies-next';
 import DashboardAdmin from '../Admin/DashboardAdmin/DashboardAdmin';
 import DashboardUser from '../User/DashboardUser/DashboardUser';
+import { isRmRole } from '../../../Utils/Constants';
 const DashBoardScreenCHANNEL = () => {
 
   const [roleId, setRoleId] = useState()
@@ -16,7 +17,7 @@ const DashBoardScreenCHANNEL = () => {
 
   return (
     <>
-      {(roleId === 1 || roleId === 2 || roleId === 31) && <DashboardUser />}
+      {(roleId === 1 || roleId === 2 || isRmRole(roleId) || roleId === 31) && <DashboardUser />}
       {(roleId === null || roleId === 3) && <DashboardAdmin />}
     </>
 

@@ -16,10 +16,10 @@ const NewRegistrationScreen = () => {
     first_name: "",
     last_name: "",
     email: "",
-    contact: null,
+    contact: "",
     state_id: "",
     city_id: "",
-    operating_location: ""
+    operating_location: "",
   });
   const [clientData, setClientData] = useState();
   const [stateList, setStateList] = useState([]);
@@ -32,7 +32,7 @@ const NewRegistrationScreen = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const { first_name, last_name, email, contact, state_id, city_id } = formFields;
+    const { first_name, last_name, email, contact, state_id, city_id, operating_location } = formFields;
 
     // Basic validations for mandatory fields
     if (!first_name || !last_name || !email || !contact || !state_id || !city_id) {
@@ -54,13 +54,24 @@ const NewRegistrationScreen = () => {
       return toast.warning("Please enter a valid email address", { autoClose: 2500 });
     }
 
-    let newFormfields = { ...formFields, db_name: clientData?.db_name }
-    console.log(newFormfields)
+    const payload = {
+      db_name: clientData?.db_name,
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      contact: String(contact).trim(),
+      email: email.trim(),
+      state_id: Number(state_id),
+      city_id: Number(city_id),
+      Operating_Location: (operating_location || "").trim(),
+      client_url: "http://18.61.246.105",
+    };
+
+    console.log(payload);
     try {
       dispatch(startButtonLoading());
       const { data } = await axios.post(
         Baseurl + `/db/channelPartnerLeads`,
-        newFormfields
+        payload
       );
 
       if (data.status === 200) {
@@ -102,11 +113,24 @@ const NewRegistrationScreen = () => {
         header
       );
 
+      let states = [];
       if (response.data?.data && Array.isArray(response.data.data)) {
-        setStateList(response.data.data);
+        states = response.data.data;
       } else if (Array.isArray(response.data)) {
-        setStateList(response.data);
+        states = response.data;
       }
+
+      const enabledStates = states.filter(
+        (state) =>
+          state.is_available === true ||
+          state.is_available === 1 ||
+          state.is_active === true ||
+          state.is_active === 1 ||
+          state.is_enabled === true ||
+          state.is_enabled === 1
+      );
+
+      setStateList(enabledStates);
     } catch (error) {
       console.error("Error fetching states:", error);
       toast.error("Failed to load states. Please refresh the page.");
@@ -137,17 +161,22 @@ const NewRegistrationScreen = () => {
       };
 
       const response = await axios.get(
-        `${Baseurl}/db/admin/city/by-state?state_id=${stateId}`,
+        `${Baseurl}/db/area/city/active?state_id=${stateId}`,
         header
       );
 
-      if (response.data?.data && Array.isArray(response.data.data)) {
-        setCityList(response.data.data);
+      const responseData = response.data?.data;
+      let cities = [];
+
+      if (Array.isArray(responseData)) {
+        cities = responseData;
+      } else if (Array.isArray(responseData?.cityData)) {
+        cities = responseData.cityData;
       } else if (Array.isArray(response.data)) {
-        setCityList(response.data);
-      } else {
-        setCityList([]);
+        cities = response.data;
       }
+
+      setCityList(cities);
     } catch (error) {
       console.error("Error fetching cities:", error);
       setCityList([]);
@@ -158,11 +187,7 @@ const NewRegistrationScreen = () => {
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        let baseUrl = window.location.origin;
-        // Handle local development URLs (localhost and local IP addresses)
-        if (baseUrl === "http://localhost:3000" || baseUrl.startsWith("http://10.") || baseUrl.startsWith("http://192.168.") || baseUrl.startsWith("http://172.")) {
-          baseUrl = "https://connect.theprosperity.in"
-        }
+        const baseUrl = "http://18.61.246.105";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

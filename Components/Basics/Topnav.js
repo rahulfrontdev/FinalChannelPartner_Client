@@ -13,7 +13,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { LoggedOut } from "../../store/adMinLoginSlice";
 import { userLogOut } from "../../store/ClientLoginSlice";
 import Link from "next/link";
-import { Baseurl, filesUrl } from "../../Utils/Constants";
+import { Baseurl, filesUrl, isRmRole } from "../../Utils/Constants";
 import axios from "axios";
 import { clearMode, masterMode, userMode } from "../../store/dbModeSlice";
 import { channel, clearValue, crm, dms, sales, media } from "../../store/permissionSlice";
@@ -170,7 +170,7 @@ const Topnav = ({ topnavPermission }) => {
         userInfo ?
           hasCookie("channel") && (userInfo?.role_id == null || userInfo?.role_id == 3) ? (
             <CP_Navbar_Admin />
-          ) : hasCookie("channel") && (userInfo?.role_id == 1 || userInfo?.role_id == 2 || userInfo?.role_id == 1) ? (
+          ) : hasCookie("channel") && (userInfo?.role_id == 1 || userInfo?.role_id == 2 || isRmRole(userInfo?.role_id)) ? (
 
             <CP_Navbar_User />
           ) : null

@@ -632,6 +632,20 @@
   border-radius: 50%;
 }
 
+.Visit-Details .finish-visit-table-btn {
+  height: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  border-radius: 12px !important;
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: none;
+  color: #fff;
+}
+
 .Channel-profile .name {
   font-size: 22px;
   font-weight: bold;
@@ -824,6 +838,131 @@
 .Visit-Details .list-group .list-right {
   color: #293790;
 }
+
+.finish-visit-dialog {
+  max-width: 520px;
+}
+
+.finish-visit-modal-content {
+  overflow: visible !important;
+  border-radius: 12px;
+}
+
+.finish-visit-modal-body {
+  padding: 24px !important;
+}
+
+.finish-visit-alert {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: #eef2f8;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.finish-visit-alert-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #d9e6f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.finish-visit-alert-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.finish-visit-alert-text {
+  margin: 0;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.finish-visit-send-btn {
+  display: block !important;
+  width: 100% !important;
+  margin-top: 20px !important;
+  min-height: 48px !important;
+  border-radius: 40px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+}
+
+.finish-visit-code-group {
+  margin-top: 20px;
+  margin-bottom: 12px;
+}
+
+.finish-visit-code-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+.finish-visit-code-input {
+  min-height: 56px !important;
+  border-radius: 12px !important;
+  border: 1px solid #d1d5db !important;
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.35em !important;
+  text-align: center;
+  color: #1f2937 !important;
+}
+
+.finish-visit-code-input::placeholder {
+  font-size: 14px !important;
+  letter-spacing: 0.08em !important;
+  color: #9ca3af !important;
+}
+
+.finish-visit-code-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.finish-visit-demo-link,
+.finish-visit-resend-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.finish-visit-resend-link {
+  font-weight: 700;
+}
+
+.finish-visit-verify-btn {
+  display: block !important;
+  width: 100% !important;
+  min-height: 48px !important;
+  border-radius: 40px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+}
+
+.finish-visit-verify-btn:disabled {
+  background-color: #d1d5db !important;
+  border-color: #d1d5db !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
 /* lead-details End */
 
 /* booking-details Start */
@@ -1121,3 +1260,23 @@
 
 
 /* lead visit request hover end */
+
+.Visit .channelTable [class*="MUIDataTableToolbar-root"],
+.Visit .channelTable [class*="MUIDataTableToolbar-left"],
+.Visit .channelTable [class*="MUIDataTableToolbar-title"] {
+  overflow: visible !important;
+  max-width: none !important;
+}
+
+.Visit .channelTable .visit-type-btns {
+  flex-wrap: nowrap !important;
+  width: auto !important;
+}
+
+.Visit .channelTable .visit-type-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: #293790 !important;
+  color: #fff !important;
+  border: 1px solid #293790 !important;
+}

@@ -307,6 +307,19 @@ const Admindashboard = () => {
                                                 </div>
                                             ) : null
                                         ))}
+                                        <div className="card_wrapper">
+                                            <div className="card_lists">
+                                                <div className="card_head">Project Management</div>
+                                                <ul className="settings_list">
+                                                    <Link href="/ProjectManagement">
+                                                        <li className="list_item">Project Management</li>
+                                                    </Link>
+                                                </ul>
+                                            </div>
+                                            <div className="icons">
+                                                <Hierarchy />
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="col-xl-6 col-md-6 col-sm-12 col-12">

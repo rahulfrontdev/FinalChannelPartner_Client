@@ -77,6 +77,7 @@ export default function ChannelSignInScreen({ setLoggedIn }) {
       dispatch(stopLoading())
     } else {
       try {
+        const clientUrl = "http://18.61.246.105";
         let baseUrl = window.location.origin;
 
         // Treat localhost / LAN URLs as development, don't send client_url there
@@ -96,7 +97,7 @@ export default function ChannelSignInScreen({ setLoggedIn }) {
               email: userForm.email.toLowerCase(),
               password: userForm.password,
               type: "partner",
-              client_url: baseUrl,
+              client_url: clientUrl,
             };
 
         const res = await axios.post(Baseurl + "/db/login", payload);
@@ -147,10 +148,7 @@ export default function ChannelSignInScreen({ setLoggedIn }) {
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        let baseUrl = window.location.origin;
-        if (baseUrl === "http://localhost:3000") {
-          baseUrl = "https://srijanbandhan.com"
-        }
+        const baseUrl = "http://18.61.246.105";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

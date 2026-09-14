@@ -8,7 +8,7 @@ import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
 import { fetchData } from "../../../../Utils/getReq";
 import Select from "react-select";
-import { Baseurl, filesUrl } from "../../../../Utils/Constants";
+import { Baseurl, filesUrl, isRmRole } from "../../../../Utils/Constants";
 import { Delete } from "@mui/icons-material";
 
 const AddUserScreen = () => {
@@ -59,6 +59,14 @@ const AddUserScreen = () => {
   });
   const clientBtnColor=hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#405189"
   const userInfoCheck=hasCookie("userInfo")?JSON.parse(getCookie("userInfo")):null;
+
+  // Auto-tick when CP is onboarded (doc_verification=2) or already in Channel Partner list
+  const isRegisteredCp =
+    Number(userInfo?.role_id) === 1 &&
+    Boolean(updtUId) &&
+    (Number(userInfo?.doc_verification) === 2 ||
+      userInfo?.doc_verification == null ||
+      userInfo?.doc_verification === "");
 
 
 
@@ -157,12 +165,14 @@ const AddUserScreen = () => {
         user_status: data1?.user_status,
         user_code: data1?.user_code,
         role_id: data1?.role_id,
+        doc_verification: data1?.doc_verification,
         country_id: data1?.country_id,
         state_id: data1?.state_id,
         city_id: data1?.city_id,
         address: data1?.address,
         pincode: data1?.pincode,
         gst: data1?.gst,
+        rera_no: data2?.rera_no || data1?.rera_no || data1?.rera_number || "",
         organisation: data1?.organisation,
         user_profle_id: data1?.user_profle_id,
         div_id: data2?.div_id,
@@ -210,9 +220,9 @@ const AddUserScreen = () => {
     const db_name = getCookie("db_name");
     setisLoading(true);
     const token = getCookie("token");
-    let reqOptions = { ...userInfo, db_name };
+    let reqOptions = { ...userInfo, db_name, client_url: "http://18.61.246.105" };
     if(userInfo?.role_id=="3"){
-      reqOptions = { ...userInfo, report_to:userInfoCheck?.user_id }
+      reqOptions = { ...userInfo, report_to:userInfoCheck?.user_id, client_url: "http://18.61.246.105" }
     }
     const header = {
       headers: {
@@ -460,7 +470,7 @@ const AddUserScreen = () => {
   const userListFilterBasisOfRole = (selectedOption, usersList) => {
     if (selectedOption == "1") {
         return [{ value: userInfo?.user_id, label: "N.A" },...usersList
-            ?.filter(user => user.role_id === 2 || user.role_id === 3)
+            ?.filter(user => user.role_id === 2 || user.role_id === 3 || isRmRole(user.role_id))
             ?.map(data => ({
                 value: data?.user_id,
                 label: data?.user,
@@ -619,7 +629,31 @@ const AddUserScreen = () => {
                   </div>
                     )
                   }
-                  
+
+                  {Number(userInfo?.role_id) === 1 && (
+                    <div className="col-xl-2 col-md-2 col-sm-12 col-12 d-flex align-items-end">
+                      <div className="input_box mb-2">
+                        <div className="form-check mt-2">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="registeredCp"
+                            checked={isRegisteredCp}
+                            readOnly
+                            onClick={(e) => e.preventDefault()}
+                            style={{ cursor: "default", accentColor: "#293790" }}
+                          />
+                          <label
+                            className="form-check-label fw-semibold"
+                            htmlFor="registeredCp"
+                            style={{ color: "#212529", cursor: "default" }}
+                          >
+                            Registered CP
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 </div>
                 <div className="row">
@@ -869,7 +903,7 @@ const AddUserScreen = () => {
 
                 <div className="col-xl-3 col-md-3 col-sm-12 col-12">
                   <div className="input_box">
-                    <label htmlFor="pan_card">GST Number </label>
+                    <label htmlFor="gst">GST Number </label>
                     <input
                       type="text"
                       placeholder="Enter GST No."
@@ -884,6 +918,27 @@ const AddUserScreen = () => {
                         })
                       }
                       value={userInfo.gst ? userInfo.gst : ""}
+                    />
+                  </div>
+                </div>
+
+                <div className="col-xl-3 col-md-3 col-sm-12 col-12">
+                  <div className="input_box">
+                    <label htmlFor="rera_no">RERA Number </label>
+                    <input
+                      type="text"
+                      placeholder="Enter RERA No."
+                      name="rera_no"
+                      id="rera_no"
+                      disabled={viewMode}
+                      className="form-control"
+                      onChange={(e) =>
+                        setUserinfo({
+                          ...userInfo,
+                          rera_no: e.target.value,
+                        })
+                      }
+                      value={userInfo.rera_no ? userInfo.rera_no : ""}
                     />
                   </div>
                 </div>

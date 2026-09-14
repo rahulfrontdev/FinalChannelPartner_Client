@@ -20,11 +20,15 @@ export async function fetchData(url, setData, errorToast, setErrorToast, bypass 
         try {
             const response = await axios.get(Baseurl + url, header);
             console.log("vvv", response)
-            setData(response?.data?.data);
+            if (typeof setData === 'function') {
+                setData(response?.data?.data);
+            }
         } catch (error) {
             if (!errorToast) {
                 console.log(error?.response?.data?.message || 'Something went wrong!');
-                setErrorToast(!errorToast);
+                if (typeof setErrorToast === 'function') {
+                    setErrorToast(!errorToast);
+                }
             }
         }
     }

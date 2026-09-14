@@ -28,6 +28,8 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(false);
     const [cityToDelete, setCityToDelete] = useState(null);
+    const [citySearch, setCitySearch] = useState('');
+    const [bulkToggling, setBulkToggling] = useState(false);
 
     const getHeader = () => {
         const token = getCookie('token');
@@ -43,6 +45,18 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
         };
     };
 
+    const mapCityAvailability = (item) => ({
+        ...item,
+        is_available:
+            item.is_enabled === true ||
+            item.is_enabled === 1 ||
+            item.is_available === true ||
+            item.is_active === true ||
+            item.is_active === 1 ||
+            item.status === true ||
+            item.active === true,
+    });
+
     const fetchCities = async (stateId) => {
         if (!stateId || !hasCookie('token')) {
             setCityList([]);
@@ -52,46 +66,22 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
         try {
             setLoadingCities(true);
             const res = await axios.get(
-                `${Baseurl}/db/admin/city/by-state?state_id=${stateId}`,
+                `${Baseurl}/db/area/city?state_id=${stateId}`,
                 getHeader()
             );
 
-            if (res.data?.data && Array.isArray(res.data.data)) {
-                const citiesWithAvailability = res.data.data.map((item) => ({
-                    ...item,
-                    is_available:
-                        item.is_enabled === true ||
-                        item.is_enabled === 1 ||
-                        item.is_available === true ||
-                        item.status === true ||
-                        item.active === true,
-                }));
-                setCityList(citiesWithAvailability);
+            const responseData = res.data?.data;
+            let cities = [];
+
+            if (Array.isArray(responseData)) {
+                cities = responseData;
+            } else if (Array.isArray(responseData?.cityData)) {
+                cities = responseData.cityData;
             } else if (Array.isArray(res.data)) {
-                const citiesWithAvailability = res.data.map((item) => ({
-                    ...item,
-                    is_available:
-                        item.is_enabled === true ||
-                        item.is_enabled === 1 ||
-                        item.is_available === true ||
-                        item.status === true ||
-                        item.active === true,
-                }));
-                setCityList(citiesWithAvailability);
-            } else if (res.data?.data?.cityData && Array.isArray(res.data.data.cityData)) {
-                const citiesWithAvailability = res.data.data.cityData.map((item) => ({
-                    ...item,
-                    is_available:
-                        item.is_enabled === true ||
-                        item.is_enabled === 1 ||
-                        item.is_available === true ||
-                        item.status === true ||
-                        item.active === true,
-                }));
-                setCityList(citiesWithAvailability);
-            } else {
-                setCityList([]);
+                cities = res.data;
             }
+
+            setCityList(cities.map(mapCityAvailability));
         } catch (error) {
             console.error('Error fetching cities:', error);
             setCityList([]);
@@ -112,8 +102,22 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
         resetForm();
         setSelectedStateId('');
         setCityList([]);
+        setCitySearch('');
         onClose();
     };
+
+    const getCityId = (city) => city.city_id ?? city.id;
+
+    const filteredCityList = cityList.filter((city) =>
+        (city.city_name || '')
+            .toLowerCase()
+            .includes(citySearch.trim().toLowerCase())
+    );
+
+    const allCitiesEnabled =
+        cityList.length > 0 && cityList.every((city) => city.is_available);
+    const allVisibleCitiesEnabled =
+        filteredCityList.length > 0 && filteredCityList.every((city) => city.is_available);
 
     useEffect(() => {
         if (open && selectedStateId) {
@@ -133,18 +137,43 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
 
         if (!hasCookie('token')) return;
 
-        const payload = editCityId
-            ? { city_id: editCityId, city_name: cityName.trim(), state_id: selectedStateId }
-            : { city_name: cityName.trim(), state_id: selectedStateId };
+        const stateId = Number(selectedStateId);
 
         try {
             setSaving(true);
-            const res = editCityId
-                ? await axios.put(`${Baseurl}/db/admin/city`, payload, getHeader())
-                : await axios.post(`${Baseurl}/db/admin/city`, payload, getHeader());
+            let res;
 
-            if (res.status === 200 || res.status === 201 || res.status === 204) {
-                toast.success(res.data?.message || (editCityId ? 'City updated successfully' : 'City created successfully'));
+            if (editCityId) {
+                const currentCity = cityList.find(
+                    (item) => (item.city_id ?? item.id) === editCityId
+                );
+                const payload = {
+                    city_id: editCityId,
+                    city_name: cityName.trim(),
+                    state_id: stateId,
+                    is_active: currentCity?.is_available ?? true,
+                };
+                res = await axios.put(`${Baseurl}/db/area/city`, payload, getHeader());
+            } else {
+                const payload = {
+                    city_name: cityName.trim(),
+                    state_id: stateId,
+                    is_active: true,
+                };
+                res = await axios.post(`${Baseurl}/db/area/city`, payload, getHeader());
+            }
+
+            const isSuccess =
+                res.status === 200 ||
+                res.status === 201 ||
+                res.status === 204 ||
+                res.data?.status === 200;
+
+            if (isSuccess) {
+                toast.success(
+                    res.data?.message ||
+                        (editCityId ? 'City updated successfully' : 'City created successfully')
+                );
                 resetForm();
                 fetchCities(selectedStateId);
             }
@@ -173,11 +202,17 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
         try {
             setSaving(true);
             const res = await axios.delete(
-                `${Baseurl}/db/admin/city?city_id=${cityId}`,
+                `${Baseurl}/db/area/city?ct_id=${cityId}`,
                 getHeader()
             );
 
-            if (res.status === 200 || res.status === 201 || res.status === 204) {
+            const isSuccess =
+                res.status === 200 ||
+                res.status === 201 ||
+                res.status === 204 ||
+                res.data?.status === 200;
+
+            if (isSuccess) {
                 toast.success(res.data?.message || 'City deleted successfully');
                 resetForm();
                 fetchCities(selectedStateId);
@@ -191,43 +226,114 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
         }
     };
 
-    const handleToggleCity = async (cityId) => {
-        const currentCity = cityList.find(
-            (item) => (item.city_id ?? item.id) === cityId
-        );
-        if (!currentCity) return;
-
-        const newAvailability = !currentCity.is_available;
-
+    const toggleCityAvailability = async (cityId, newAvailability) => {
         setCityList((prev) =>
             prev.map((item) =>
-                (item.city_id ?? item.id) === cityId
-                    ? { ...item, is_available: newAvailability }
+                getCityId(item) === cityId
+                    ? { ...item, is_available: newAvailability, is_active: newAvailability }
                     : item
             )
         );
 
         try {
-            const payload = {
-                city_id: cityId,
-                is_enabled: newAvailability,
-            };
-
-            await axios.put(
-                `${Baseurl}/db/admin/city/toggle-availability`,
-                payload,
+            // Enable / disable via PATCH /db/area/city
+            await axios.patch(
+                `${Baseurl}/db/area/city`,
+                { city_id: cityId, is_active: newAvailability },
                 getHeader()
+            );
+            return true;
+        } catch (error) {
+            setCityList((prev) =>
+                prev.map((item) =>
+                    getCityId(item) === cityId
+                        ? { ...item, is_available: !newAvailability, is_active: !newAvailability }
+                        : item
+                )
+            );
+            throw error;
+        }
+    };
+
+    // Enable / Disable All (or visible) cities — single PATCH call (no per-city loop)
+    const bulkUpdateCities = async (cities, isActive) => {
+        if (!cities.length) {
+            toast.info(
+                isActive
+                    ? 'All cities are already enabled'
+                    : 'All cities are already disabled'
+            );
+            return;
+        }
+
+        if (!hasCookie('token') || !selectedStateId) return;
+
+        const idsToUpdate = cities.map(getCityId);
+        const idSet = new Set(idsToUpdate);
+
+        setCityList((prev) =>
+            prev.map((item) =>
+                idSet.has(getCityId(item))
+                    ? { ...item, is_available: isActive, is_active: isActive }
+                    : item
+            )
+        );
+
+        setBulkToggling(true);
+        try {
+            await axios.patch(
+                `${Baseurl}/db/area/city`,
+                {
+                    state_id: Number(selectedStateId),
+                    city_id: idsToUpdate,
+                    is_active: isActive,
+                },
+                getHeader()
+            );
+            toast.success(
+                `Cit${cities.length === 1 ? 'y' : 'ies'} ${isActive ? 'enabled' : 'disabled'} successfully`
             );
         } catch (error) {
             setCityList((prev) =>
                 prev.map((item) =>
-                    (item.city_id ?? item.id) === cityId
-                        ? { ...item, is_available: !newAvailability }
+                    idSet.has(getCityId(item))
+                        ? { ...item, is_available: !isActive, is_active: !isActive }
                         : item
                 )
             );
+            toast.error(
+                error?.response?.data?.message ||
+                    `Failed to ${isActive ? 'enable' : 'disable'} cities`
+            );
+        } finally {
+            setBulkToggling(false);
+        }
+    };
+
+    const handleToggleCity = async (cityId) => {
+        const currentCity = cityList.find((item) => getCityId(item) === cityId);
+        if (!currentCity) return;
+
+        const newAvailability = !currentCity.is_available;
+
+        try {
+            await toggleCityAvailability(cityId, newAvailability);
+        } catch (error) {
             toast.error(error?.response?.data?.message || 'Failed to update city status');
         }
+    };
+
+    const handleToggleAllCities = async () => {
+        const shouldEnable = !allCitiesEnabled;
+        await bulkUpdateCities(cityList, shouldEnable);
+    };
+
+    const handleToggleVisibleCities = async () => {
+        const shouldEnable = !allVisibleCitiesEnabled;
+        const citiesToUpdate = filteredCityList.filter(
+            (city) => city.is_available !== shouldEnable
+        );
+        await bulkUpdateCities(citiesToUpdate, shouldEnable);
     };
 
     return (
@@ -276,6 +382,7 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
                             onChange={(e) => {
                                 setSelectedStateId(e.target.value);
                                 resetForm();
+                                setCitySearch('');
                             }}
                         >
                             <MenuItem value="">
@@ -343,9 +450,68 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
                             No cities found for this state
                         </p>
                     ) : (
+                        <>
+                            <Box sx={{ mb: 2, mt: 1 }}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Search City"
+                                    placeholder="Search city by name"
+                                    value={citySearch}
+                                    onChange={(e) => setCitySearch(e.target.value)}
+                                />
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    gap: 1,
+                                    mb: 1,
+                                    pb: 1,
+                                    borderBottom: '1px solid #eee',
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Switch
+                                        color="primary"
+                                        size="small"
+                                        checked={allCitiesEnabled}
+                                        onChange={handleToggleAllCities}
+                                        disabled={bulkToggling}
+                                    />
+                                    <span style={{ fontSize: 14, fontWeight: 500 }}>
+                                        {allCitiesEnabled ? 'Disable All Cities' : 'Enable All Cities'}
+                                    </span>
+                                </Box>
+                                {citySearch.trim() && filteredCityList.length > 0 && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Switch
+                                            color="primary"
+                                            size="small"
+                                            checked={allVisibleCitiesEnabled}
+                                            onChange={handleToggleVisibleCities}
+                                            disabled={bulkToggling}
+                                        />
+                                        <span style={{ fontSize: 13 }}>
+                                            {allVisibleCitiesEnabled
+                                                ? 'Disable Visible'
+                                                : 'Enable Visible'}
+                                        </span>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            {filteredCityList.length === 0 ? (
+                                <p style={{ textAlign: 'center', color: '#888', padding: '20px 0' }}>
+                                    No cities match your search
+                                </p>
+                            ) : (
                         <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0' }}>
-                            {cityList.map((city) => {
-                                const id = city.city_id ?? city.id;
+                            {filteredCityList.map((city) => {
+                                const id = getCityId(city);
                                 return (
                                     <li
                                         key={id}
@@ -387,6 +553,8 @@ const CityMasterModal = ({ open, onClose, stateList }) => {
                                 );
                             })}
                         </ul>
+                            )}
+                        </>
                     )}
                 </Box>
 

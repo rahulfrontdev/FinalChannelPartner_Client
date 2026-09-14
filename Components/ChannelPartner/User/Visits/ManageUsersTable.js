@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { Button, Modal } from 'react-bootstrap';
 import Select from 'react-select';
 import axios from 'axios';
-import { Baseurl } from '../../../../Utils/Constants';
+import { Baseurl, getVisitDateLabel, showCpVisitScheduleColumns } from '../../../../Utils/Constants';
 import { getCookie, hasCookie, setCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
 import PlusIcon from '../../../Svg/PlusIcon';
@@ -18,7 +18,7 @@ import * as XLSX from "xlsx";
 
 
 
-const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo,setoldAssignTo, setShowDateFilter,getVisitList,loader,cpId,setCpId,statusId,setStatusId }) => {
+const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo,setoldAssignTo, setShowDateFilter,getVisitList,loader,cpId,setCpId,statusId,setStatusId, visitType = "client", setVisitType, showVisitTypeToggle = false }) => {
     const router = useRouter()
     const [data, setData] = useState([])
     const [userData, setUserData] =  useState([])
@@ -31,6 +31,8 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const [errorToast, setErrorToast] = useState(false);
   const [usersList, setUsersList] = useState([]);
   const userInfoCheck=hasCookie("userInfo")?JSON.parse(getCookie("userInfo")):null;
+  const visitDateLabel = getVisitDateLabel(userInfoCheck?.role_id);
+  const showScheduleColumns = showCpVisitScheduleColumns(userInfoCheck);
 
   async function getUsersList() {
     await fetchData("/db/users", setUsersList, errorToast, setErrorToast);
@@ -105,27 +107,37 @@ const [value, setValue] = useState(getCurrentWeekDates());
 
   const matchTimeSearch = (timeValue, searchQuery) => {
     if (!timeValue || !searchQuery?.trim()) return false;
-    const q = searchQuery.trim().toLowerCase();
-    const formatted = formatTime(timeValue).toLowerCase();
-    const raw = String(timeValue).toLowerCase();
+    // Normalize spaces (locale may use NBSP before AM/PM)
+    const normalize = (s) =>
+      String(s)
+        .toLowerCase()
+        .replace(/[\u00a0\u202f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    const q = normalize(searchQuery);
+    const formatted = normalize(formatTime(timeValue));
+    const raw = normalize(timeValue);
 
-    const variants = [formatted, raw];
-    const timeParts = String(timeValue).split(':');
+    const variants = [formatted, raw, formatted.replace(/^0/, "")];
+    const timeParts = String(timeValue).split(":");
     if (timeParts.length >= 2) {
       const hours = parseInt(timeParts[0], 10);
       const minutes = parseInt(timeParts[1], 10);
       if (!isNaN(hours) && !isNaN(minutes)) {
         const h12 = hours % 12 || 12;
-        const ampm = hours >= 12 ? 'pm' : 'am';
+        const ampm = hours >= 12 ? "pm" : "am";
+        const mm = String(minutes).padStart(2, "0");
         variants.push(
-          `${h12}:${String(minutes).padStart(2, '0')}`,
-          `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`,
-          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+          `${h12}:${mm}`,
+          `${h12}:${mm} ${ampm}`,
+          `${h12}:${mm}${ampm}`,
+          `${String(hours).padStart(2, "0")}:${mm}`,
+          `${String(hours).padStart(2, "0")}:${mm}:00`,
         );
       }
     }
 
-    return variants.map((v) => v.toLowerCase()).some((v) => v.includes(q));
+    return variants.map(normalize).some((v) => v.includes(q));
   };
 
   const customTableSearch = (searchQuery, currentRow, columns) => {
@@ -137,16 +149,20 @@ const [value, setValue] = useState(getCurrentWeekDates());
       if (cell == null || cell === '') continue;
 
       const colName = columns[i]?.name;
+      // Date columns only — do NOT put time fields here (they would skip matchTimeSearch)
       if (
         colName === 'assigning_date' ||
         colName === 'completed_date' ||
-        colName === 'p_visit_date'
+        colName === 'p_visit_date' ||
+        colName === 'follow_up_date' ||
+        colName === 'scheduled_date' ||
+        colName === 'activation_date'
       ) {
         if (matchDateSearch(cell, searchQuery)) return true;
         continue;
       }
 
-      if (colName === 'p_visit_time') {
+      if (colName === 'p_visit_time' || colName === 'scheduled_time' || colName === 'activation_time') {
         if (matchTimeSearch(cell, searchQuery)) return true;
         continue;
       }
@@ -324,7 +340,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
       },
         {
             name: 'p_visit_date',
-            label: "Visit Date",
+            label: visitDateLabel,
             options: {
                 filter: false,
                 customHeadRender: (columnMeta, updateDirection) => (
@@ -415,12 +431,127 @@ const [value, setValue] = useState(getCurrentWeekDates());
         },
     ];
 
+    const cpVisitColumns = [
+      {
+        name: 'cpl_id',
+        label: "Lead ID",
+        options: {
+          filter: false,
+          customHeadRender: (columnMeta) => (
+            <th style={{ background: `${clientBtnColor}`, color: 'white', paddingLeft: "15px", padding: "8px" }}>
+              {columnMeta.label}
+            </th>
+          ),
+          customBodyRender: (value) => (
+            <div className='status_box fw-bold' style={{ color: "#293790" }}>{value}</div>
+          ),
+        },
+      },
+      {
+        name: 'leadName',
+        label: "CP Lead Name",
+        options: {
+          filter: false,
+          customHeadRender: (columnMeta) => (
+            <th style={{ background: `${clientBtnColor}`, color: 'white', paddingLeft: "15px", padding: "8px" }}>
+              {columnMeta.label}
+            </th>
+          ),
+          customBodyRender: (value) => (
+            <div className='status_box fw-bold' style={{ color: "#293790" }}>{value}</div>
+          ),
+        },
+      },
+      {
+        name: 'email',
+        label: "Email",
+        options: {
+          filter: false,
+          customHeadRender: (columnMeta) => (
+            <th style={{ background: `${clientBtnColor}`, color: 'white', paddingLeft: "15px", padding: "8px" }}>
+              {columnMeta.label}
+            </th>
+          ),
+          customBodyRender: (value) => (
+            <div className='status_box fw-bold' style={{ color: "#293790" }}>{value}</div>
+          ),
+        },
+      },
+      {
+        name: 'contact',
+        label: "Contact No.",
+        options: {
+          filter: false,
+          customHeadRender: (columnMeta) => (
+            <th style={{ background: `${clientBtnColor}`, color: 'white', paddingLeft: "15px", padding: "8px" }}>
+              {columnMeta.label}
+            </th>
+          ),
+          customBodyRender: (value) => (
+            <div className='status_box' style={{ color: "#667799" }}>+91-{value}</div>
+          ),
+        },
+      },
+      {
+        name: 'cpl_id',
+        label: "Action",
+        options: {
+          filter: false,
+          sort: false,
+          download: false,
+          print: false,
+          customHeadRender: (columnMeta) => (
+            <th style={{ background: `${clientBtnColor}`, color: 'white', paddingLeft: "15px", padding: "8px" }}>
+              {columnMeta.label}
+            </th>
+          ),
+          customBodyRender: (value) => (
+            <Link
+              href={`/partner/VisitDetails?id=${value}&type=cp`}
+              className="btn btn-sm text-white"
+              style={{ background: clientBtnColor, borderRadius: "20px", padding: "6px 16px" }}
+            >
+              View Detail
+            </Link>
+          ),
+        },
+      },
+    ];
+
     let statusArray=[{id:"",label:"All"},{id:"Requested",label:"Requested"},{id:"Scheduled",label:"Scheduled"},{id:"Rescheduled",label:"Rescheduled"},{id:"Completed",label:"Completed"},{id:"Rejected",label:"Rejected"}]
   
     const CustomToolbar = () => {
+        const visitBtnStyle = {
+          background: "#293790",
+          color: "#fff",
+          padding: "6px",
+          borderRadius: "20px",
+          border: "1px solid #293790",
+        };
+
         return (
-            <div className=' d-flex justify-content-start gap-3 align-items-center '>
-                <p className='fw-bold ' style={{fontSize:"18px"}} >{title}</p>
+            <div className='customToolHead visit-type-btns d-flex justify-content-start gap-2 align-items-center'>
+                <p className='fw-bold' style={{fontSize:"18px"}} >{title}</p>
+                {showVisitTypeToggle && (
+                  <div className="d-flex gap-2 align-items-center">
+                    <button
+                      type="button"
+                      className="pe-3 ps-3 visit-type-btn"
+                      style={visitBtnStyle}
+                      onClick={() => setVisitType?.("client")}
+                    >
+                      Client visit
+                    </button>
+                    <button
+                      type="button"
+                      className="pe-3 ps-3 visit-type-btn"
+                      style={visitBtnStyle}
+                      onClick={() => setVisitType?.("cp")}
+                    >
+                      CP visit
+                    </button>
+                  </div>
+                )}
                 {/* <DateRange value={value} setValue={setValue} getData={getVisitList} filterType={title} /> */}
                 {/* {
                   (userInfoCheck?.isDB || userInfoCheck?.role_id=="3" ) && (
@@ -520,6 +651,196 @@ const [value, setValue] = useState(getCurrentWeekDates());
         setUserData([...data]); 
     };
 
+    const downloadCpVisitReport = async () => {
+      if (!hasCookie("token")) {
+        toast.error("Please login again", { autoClose: 2500 });
+        return;
+      }
+
+      const token = getCookie("token");
+      const db_name = getCookie("db_name");
+      const header = {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          db: db_name,
+          pass: "pass",
+        },
+      };
+
+      const leadMap = {};
+      (Array.isArray(dataList) ? dataList : []).forEach((list) => {
+        const cplId = list?.cpl_id;
+        if (cplId == null || leadMap[cplId]) return;
+        leadMap[cplId] = {
+          cpl_id: cplId,
+          leadName:
+            list?.name ||
+            `${list?.first_name || ""} ${list?.last_name || ""}`.trim() ||
+            "",
+          email: list?.email || "",
+          contact: list?.contact || "",
+          registration_date: list?.createdAt || list?.registration_date || "",
+        };
+      });
+
+      const leads = Object.values(leadMap);
+      if (!leads.length) {
+        toast.error("No CP visit records found", { autoClose: 2500 });
+        return;
+      }
+
+      toast.info("Generating CP Visits report...", { autoClose: 1500 });
+
+      const reportRows = [];
+      for (const lead of leads) {
+        let history = [];
+        let leadInfo = lead;
+        try {
+          const { data } = await axios.get(
+            `${Baseurl}/db/channelPartnerLeads/getVisitHistory?cpl_id=${lead.cpl_id}`,
+            header
+          );
+          history = Array.isArray(data?.data?.visit_history)
+            ? data.data.visit_history
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+          if (data?.data?.lead) {
+            leadInfo = {
+              ...lead,
+              leadName:
+                data.data.lead.name ||
+                lead.leadName,
+              email: data.data.lead.email || lead.email,
+              contact: data.data.lead.contact || lead.contact,
+              registration_date:
+                data.data.lead.registration_date ||
+                data.data.lead.createdAt ||
+                lead.registration_date,
+            };
+          }
+        } catch (error) {
+          history = [];
+        }
+
+        const leadName = leadInfo.leadName || "";
+        const email = leadInfo.email || "";
+        const contact = leadInfo.contact ? `+91-${leadInfo.contact}` : "";
+        const registrationDate = leadInfo.registration_date
+          ? formatDate(leadInfo.registration_date)
+          : "";
+
+        if (!history.length) {
+          reportRows.push([
+            lead.cpl_id,
+            leadName,
+            email,
+            contact,
+            registrationDate,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+          ]);
+          continue;
+        }
+
+        history.forEach((item, index) => {
+          const isFirst = index === 0;
+          const assignedTo =
+            item?.assigned_to_name ||
+            item?.bst_name ||
+            item?.user ||
+            (typeof item?.assigned_to === "string" &&
+            Number.isNaN(Number(item.assigned_to))
+              ? item.assigned_to
+              : "") ||
+            "";
+          const status =
+            item?.visit_status ||
+            item?.status ||
+            item?.stage ||
+            "";
+          reportRows.push([
+            isFirst ? lead.cpl_id : "",
+            isFirst ? leadName : "",
+            isFirst ? email : "",
+            isFirst ? contact : "",
+            isFirst ? registrationDate : "",
+            item?.project_name || item?.sales_project_name || "",
+            item?.schedule_visit_date || item?.follow_up_date
+              ? formatDate(item?.schedule_visit_date || item?.follow_up_date)
+              : "",
+            item?.schedule_visit_time || item?.follow_up_time
+              ? formatTime(item?.schedule_visit_time || item?.follow_up_time)
+              : "",
+            item?.activation_date ? formatDate(item.activation_date) : "",
+            item?.activation_time ? formatTime(item.activation_time) : "",
+            item?.visit_type || "",
+            assignedTo,
+            status,
+          ]);
+        });
+      }
+
+      let range;
+      if (hasCookie("VisitsFilter")) {
+        range = JSON.parse(getCookie("VisitsFilter"));
+      }
+
+      const headers = [
+        "Lead ID",
+        "CP Lead Name",
+        "Email",
+        "Contact No.",
+        "Registration Date",
+        "Project Name",
+        "Scheduled Date",
+        "Scheduled Time",
+        "Activation Date",
+        "Activation Time",
+        "Visit Type",
+        "Assigned To",
+        "Status",
+      ];
+
+      const customData = [
+        ["CP Visits Report"],
+        [],
+        ["Filter by:"],
+        [],
+        [
+          `Date Range: ${
+            range?.f_date ? formatDate(range?.f_date) : formatDate(start)
+          } to ${
+            range?.t_date ? formatDate(range?.t_date) : formatDate(end)
+          }`,
+        ],
+        [],
+        [],
+        headers,
+        ...reportRows,
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(customData);
+      worksheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: headers.length - 1 } },
+        { s: { r: 2, c: 0 }, e: { r: 3, c: headers.length - 1 } },
+        { s: { r: 4, c: 0 }, e: { r: 4, c: headers.length - 1 } },
+        { s: { r: 5, c: 0 }, e: { r: 6, c: headers.length - 1 } },
+      ];
+      worksheet["!cols"] = headers.map(() => ({ wch: 18 }));
+      XLSX.utils.book_append_sheet(workbook, worksheet, "CPVisits");
+      XLSX.writeFile(workbook, "CPVisits.xlsx");
+      toast.success("CP Visits report downloaded", { autoClose: 2000 });
+    };
+
     const options = {
         selectableRows: 'none',
         responsive: "standard",
@@ -529,6 +850,10 @@ const [value, setValue] = useState(getCurrentWeekDates());
         viewColumns: false,
         customSearch: customTableSearch,
         onDownload: (buildHead, buildBody, columns, data) => {
+              if (visitType === "cp") {
+                downloadCpVisitReport();
+                return false;
+              }
               const workbook = XLSX.utils.book_new();
               let range;
               if(hasCookie("VisitsFilter")){
@@ -579,7 +904,9 @@ const [value, setValue] = useState(getCurrentWeekDates());
           }          
     };
 
-    const mappedDataList=dataList?.map(list=>({
+    const safeDataList = Array.isArray(dataList) ? dataList : [];
+
+    const mappedDataList=safeDataList.map(list=>({
       visit_id:list?.visit_id,
       visit_code:list?.visit_code,
       leadDataName:list?.leadData?.lead_name,
@@ -592,6 +919,27 @@ const [value, setValue] = useState(getCurrentWeekDates());
       assigning_date: list?.createdAt,
       completed_date: list?.status === "Completed" ? list?.updatedAt : ""
     }))
+
+    const mappedCpVisitList = (() => {
+      const byLead = {};
+      safeDataList.forEach((list) => {
+        const cplId = list?.cpl_id;
+        if (cplId == null) return;
+        if (!byLead[cplId]) {
+          byLead[cplId] = {
+            cpl_id: cplId,
+            leadName: list?.name || `${list?.first_name || ""} ${list?.last_name || ""}`.trim(),
+            email: list?.email,
+            contact: list?.contact,
+          };
+        }
+      });
+      return Object.values(byLead);
+    })();
+
+    const activeColumns = visitType === "cp" ? cpVisitColumns : columns;
+    const activeData = visitType === "cp" ? mappedCpVisitList : mappedDataList;
+    const downloadFileName = visitType === "cp" ? "CPVisits" : "ChannelVisits";
       
  
     return (
@@ -603,16 +951,15 @@ const [value, setValue] = useState(getCurrentWeekDates());
           <div className="miuiTable channelTable">
                 <MUIDataTable
                     title={<CustomToolbar/>}
-                    data={mappedDataList}
-                    // data={dataList}
-                    columns={columns}
-                    // options={options}
+                    data={activeData}
+                    columns={activeColumns}
                     options={{
                       ...options,
+                      downloadOptions: { filename: downloadFileName },
                       customFilterDialogFooter: () => (
                         <div
                           style={{
-                            minWidth: "300px", // Set consistent width
+                            minWidth: "300px",
                           }}
                         />
                       ),

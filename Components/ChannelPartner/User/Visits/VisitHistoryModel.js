@@ -1,111 +1,107 @@
 import React from 'react';
-import { Modal, Table, Button } from 'react-bootstrap';
+import { Modal, Table } from 'react-bootstrap';
 
-const VisitHistoryModel = ({ show, setShow, visitHistory }) => {
+const VisitHistoryModel = ({
+  show,
+  setShow,
+  visitHistory,
+  showScheduleActivationColumns = false,
+  // legacy alias (BST-only callers)
+  isBstProfile = false,
+}) => {
+    const showScheduleColumns = showScheduleActivationColumns || isBstProfile;
+
     function formatTime(timeString) {
-        const timeParts = (timeString || '').split(':');
-        const hours = parseInt(timeParts[0]);
-        const minutes = parseInt(timeParts[1]);
-      
+        if (!timeString) return '';
+        const timeParts = String(timeString).split(':');
+        const hours = parseInt(timeParts[0], 10);
+        const minutes = parseInt(timeParts[1], 10);
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) return String(timeString);
+
         const date = new Date(2000, 0, 1, hours, minutes);
-      
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     }
-      
+
     function formatDate(date) {
+        if (!date) return '';
         const d = new Date(date);
+        if (Number.isNaN(d.getTime())) return '';
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${day}/${month}/${year}`;
     }
 
-    const visitHistorys = [
-        { revisit_date: '2024-09-04', revisit_time: '15:35:00', remark: 'Consultation' },
-        { revisit_date: '2024-09-05', revisit_time: '15:35:00', remark: 'Annual review' },
-        { revisit_date: '2024-09-01', revisit_time: '15:35:00', remark: 'First visit' },
-        { revisit_date: '2024-09-02', revisit_time: '15:35:00', remark: 'Follow-up visit' },
-        { revisit_date: '2024-09-03', revisit_time: '15:35:00', remark: 'Routine check-up' },
-    ];
-
-    // Function to download the table data as CSV
-    const downloadCSV = () => {
-        const csvRows = [];
-        // Headers
-        csvRows.push(['SN', 'Revisit Date', 'Revisit Time', 'Remark'].join(','));
-
-        // Data Rows
-        visitHistorys.forEach((visit, index) => {
-            const row = [
-                index + 1,
-                formatDate(visit.revisit_date),
-                formatTime(visit.revisit_time),
-                visit.remark
-            ];
-            csvRows.push(row.join(','));
-        });
-
-        // Create a Blob from the CSV data
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([csvString], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-
-        // Create a link element and trigger a download
-        const a = document.createElement('a');
-        a.setAttribute('href', url);
-        a.setAttribute('download', 'visit_history.csv');
-        a.click();
-
-        // Clean up the URL object
-        URL.revokeObjectURL(url);
-    };
+    const emptyColSpan = showScheduleColumns ? 7 : 4;
 
     return (
-        <>
-            <Modal
-                show={show}
-                onHide={() => setShow(false)}
-                size="xl"
-                top
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Revisits History</Modal.Title>
-                </Modal.Header>
-                <Modal.Body style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    <Table striped bordered hover responsive>
-                        <thead>
-                            <tr>
-                                <th>SN</th>
-                                <th>Revisit Date</th>
-                                <th>Revisit Time</th>
-                                <th>Remark</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visitHistory.length > 0 ? (
-                                visitHistory.map((visit, index) => (
-                                    <tr key={index}>
-                                        <td>{index + 1}</td>
-                                        <td>{visit?.revisit_date ? formatDate(visit?.revisit_date) : ""}</td>
-                                        <td>{visit?.revisit_time ? formatTime(visit?.revisit_time) : ""}</td>
-                                        <td>{visit?.remark ? visit?.remark : ""}</td>
-                                    </tr>
-                                ))
+        <Modal show={show} onHide={() => setShow(false)} size="xl" top>
+            <Modal.Header closeButton>
+                <Modal.Title>{showScheduleColumns ? 'Visit History' : 'Revisits History'}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <Table striped bordered hover responsive>
+                    <thead>
+                        <tr>
+                            <th>SN</th>
+                            {showScheduleColumns ? (
+                                <>
+                                    <th>Scheduled Date</th>
+                                    <th>Scheduled Time</th>
+                                    <th>Activation Date</th>
+                                    <th>Activation Time</th>
+                                    <th>Project Name</th>
+                                </>
                             ) : (
-                                <tr>
-                                    <td colSpan="4" className="text-center">
-                                        No visit history available.
-                                    </td>
-                                </tr>
+                                <>
+                                    <th>Revisit Date</th>
+                                    <th>Revisit Time</th>
+                                </>
                             )}
-                        </tbody>
-                    </Table>
-                    {/* <Button variant="primary" onClick={downloadCSV}>
-                        Download CSV
-                    </Button> */}
-                </Modal.Body>
-            </Modal>
-        </>
+                            <th>Remark</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visitHistory.length > 0 ? (
+                            visitHistory.map((visit, index) => (
+                                <tr key={index}>
+                                    <td>{index + 1}</td>
+                                    {showScheduleColumns ? (
+                                        <>
+                                            <td>
+                                                {formatDate(
+                                                    visit?.scheduled_date || visit?.revisit_date
+                                                )}
+                                            </td>
+                                            <td>
+                                                {formatTime(
+                                                    visit?.scheduled_time || visit?.revisit_time
+                                                )}
+                                            </td>
+                                            <td>{formatDate(visit?.activation_date)}</td>
+                                            <td>{formatTime(visit?.activation_time)}</td>
+                                            <td>{visit?.project_name || ''}</td>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <td>{visit?.revisit_date ? formatDate(visit?.revisit_date) : ''}</td>
+                                            <td>{visit?.revisit_time ? formatTime(visit?.revisit_time) : ''}</td>
+                                        </>
+                                    )}
+                                    <td>{visit?.remark || ''}</td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={emptyColSpan} className="text-center">
+                                    No visit history available.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </Table>
+            </Modal.Body>
+        </Modal>
     );
 };
 
