@@ -110,7 +110,7 @@ const FinishVisitModal = ({
               </div>
               <div>
                 <p className="finish-visit-alert-title">
-                  Visit saved · status {visitStatus || "Upcoming"}
+                  Visit saved · status {visitStatus || "Scheduled Visit"}
                 </p>
                 <p className="finish-visit-alert-text">
                   Tap <strong>Finish Visit</strong> to send the verification code to the CP.

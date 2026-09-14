@@ -511,7 +511,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
               className="btn btn-sm text-white"
               style={{ background: clientBtnColor, borderRadius: "20px", padding: "6px 16px" }}
             >
-              View All
+              View Detail
             </Link>
           ),
         },

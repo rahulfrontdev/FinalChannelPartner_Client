@@ -102,6 +102,10 @@ const CPRegisterLeadsTable = ({
   const [selectedAssignProjects, setSelectedAssignProjects] = useState([]);
   const [selectedAssignRms, setSelectedAssignRms] = useState([]);
   const [assignRmSaving, setAssignRmSaving] = useState(false);
+  const [rmAssignMap, setRmAssignMap] = useState({});
+  const [showRmDetails, setShowRmDetails] = useState(false);
+  const [rmDetailsLead, setRmDetailsLead] = useState(null);
+  const [rmDetailsList, setRmDetailsList] = useState([]);
   const visitTypeOptions = [
     { value: "Video Visit", label: "Video Visit" },
     { value: "Site Visit", label: "Site Visit" },
@@ -196,8 +200,22 @@ const CPRegisterLeadsTable = ({
     getUsersList();
     getProjectList();
     getPmProjectList();
+    try {
+      const saved = localStorage.getItem("cpLeadRmAssignMap");
+      if (saved) setRmAssignMap(JSON.parse(saved) || {});
+    } catch (e) {
+      setRmAssignMap({});
+    }
   }, [])
 
+  const saveRmAssignMap = (nextMap) => {
+    setRmAssignMap(nextMap);
+    try {
+      localStorage.setItem("cpLeadRmAssignMap", JSON.stringify(nextMap));
+    } catch (e) {
+      // ignore storage errors
+    }
+  };
   const pmProjectOptions = useMemo(
     () =>
       pmProjectList.map((p) => ({
@@ -253,6 +271,100 @@ const CPRegisterLeadsTable = ({
     setSelectedAssignRms([]);
   };
 
+  const getUserLocation = (user = {}) => {
+    const state =
+      user?.db_state?.state_name ||
+      user?.state_name ||
+      (typeof user?.state === "string" ? user.state : "") ||
+      user?.userState?.state_name ||
+      user?.db_user_state?.state_name ||
+      "-";
+    const city =
+      user?.db_city?.city_name ||
+      user?.city_name ||
+      (typeof user?.city === "string" ? user.city : "") ||
+      user?.userCity?.city_name ||
+      user?.db_user_city?.city_name ||
+      "-";
+    return { state: state || "-", city: city || "-" };
+  };
+
+  const resolveAssignedRmsForLead = (lead = {}) => {
+    const localRm = rmAssignMap?.[String(lead?.cpl_id)] || {};
+    let ids = [];
+
+    if (Array.isArray(lead?.rm_ids) && lead.rm_ids.length) {
+      ids = lead.rm_ids.map(String);
+    } else if (Array.isArray(localRm?.rm_ids) && localRm.rm_ids.length) {
+      ids = localRm.rm_ids.map(String);
+    } else if (lead?.rm_id || lead?.assigned_rm || localRm?.rm_id) {
+      ids = [String(lead?.rm_id || lead?.assigned_rm || localRm?.rm_id)];
+    }
+
+    // Fallback: parse names if only names are stored
+    if (!ids.length) {
+      const nameStr =
+        lead?.rm_name ||
+        lead?.assigned_rm_name ||
+        localRm?.rm_name ||
+        "";
+      const names = String(nameStr)
+        .split(",")
+        .map((n) => n.trim())
+        .filter(Boolean);
+      return names.map((name) => {
+        const lower = name.toLowerCase();
+        const user = usersList?.find((u) => {
+          const uName = String(u?.user || u?.name || "").toLowerCase().trim();
+          if (!uName) return false;
+          return (
+            uName === lower ||
+            uName.includes(lower) ||
+            lower.includes(uName) ||
+            String(u?.email || "").toLowerCase() === lower
+          );
+        });
+        const loc = getUserLocation(user || {});
+        return {
+          user_id: user?.user_id || "",
+          name: user?.user || user?.name || name,
+          contact:
+            user?.contact_number || user?.contact || user?.phone || "-",
+          email: user?.email || "-",
+          state: loc.state,
+          city: loc.city,
+        };
+      });
+    }
+
+    return ids.map((id) => {
+      const user = usersList?.find((u) => String(u.user_id) === String(id));
+      const loc = getUserLocation(user || {});
+      return {
+        user_id: id,
+        name: user?.user || user?.name || user?.email || `User ${id}`,
+        contact: user?.contact_number || user?.contact || user?.phone || "-",
+        email: user?.email || "-",
+        state: loc.state,
+        city: loc.city,
+      };
+    });
+  };
+
+  const openRmDetailsPopup = (lead) => {
+    const list = resolveAssignedRmsForLead(lead);
+    if (!list.length) return;
+    setRmDetailsLead(lead);
+    setRmDetailsList(list);
+    setShowRmDetails(true);
+  };
+
+  const closeRmDetailsPopup = () => {
+    setShowRmDetails(false);
+    setRmDetailsLead(null);
+    setRmDetailsList([]);
+  };
+
   const submitAssignRm = async () => {
     if (!assignRmLead?.cpl_id) {
       toast.error("Lead not found", { autoClose: 2500 });
@@ -272,33 +384,51 @@ const CPRegisterLeadsTable = ({
     const db_name = getCookie("db_name");
     const primaryRm = selectedAssignRms[0];
     const primaryProject = selectedAssignProjects[0];
+    const rmId = Number(primaryRm.value) || primaryRm.value;
+    const rmIds = selectedAssignRms.map((r) => Number(r.value) || r.value);
+    const projectIds = selectedAssignProjects.map(
+      (p) => Number(p.value) || p.value
+    );
+    const rmName =
+      selectedAssignRms.map((r) => r.label).filter(Boolean).join(", ") ||
+      primaryRm.label;
 
     const payload = {
-      ...assignRmLead,
+      cpl_id: Number(assignRmLead.cpl_id) || assignRmLead.cpl_id,
       db_name,
-      client_url: "http://18.61.246.105",
-      asssigned_to: Number(primaryRm.value) || primaryRm.value,
       project_id: Number(primaryProject.value) || primaryProject.value,
-      project_name: primaryProject.label,
-      project_ids: selectedAssignProjects.map((p) => Number(p.value) || p.value),
-      rm_ids: selectedAssignRms.map((r) => Number(r.value) || r.value),
-      bst_ids: selectedAssignRms.map((r) => Number(r.value) || r.value),
+      project_ids: projectIds,
+      rm_id: rmId,
+      rm_ids: rmIds,
+      assigned_rm: rmId,
+      rm_name: rmName,
+      assigned_rm_name: rmName,
     };
 
     setAssignRmSaving(true);
     try {
-      const response = await axios.put(
-        `${Baseurl}/db/channelPartnerLeads`,
+      const response = await axios.post(
+        `${Baseurl}/db/channelPartnerLeads/assign-rm`,
         payload,
         {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${token}`,
+            db: db_name,
             pass: "pass",
           },
         }
       );
       if (response.status === 200 || response.status === 201) {
+        const nextMap = {
+          ...rmAssignMap,
+          [String(assignRmLead.cpl_id)]: {
+            rm_id: rmId,
+            rm_ids: rmIds,
+            rm_name: rmName,
+          },
+        };
+        saveRmAssignMap(nextMap);
         toast.success(response?.data?.message || "Assigned to RM successfully", {
           autoClose: 2500,
         });
@@ -1015,6 +1145,61 @@ const CPRegisterLeadsTable = ({
               {value}
             </span>
           )
+        },
+      },
+    },
+    {
+      name: "rm_name",
+      label: "Assign To RM",
+      options: {
+        filter: true,
+        display: (userInfo?.isDB || userInfo?.role_id == 3) ? true : false,
+        customHeadRender: (columnMeta, updateDirection) => (
+          <th style={headerCellStyle}>
+            {columnMeta.label}
+          </th>
+        ),
+        customBodyRenderLite: (dataIndex) => {
+          const row = dataList?.[dataIndex] || {};
+          const localRm = rmAssignMap?.[String(row?.cpl_id)] || {};
+          const rmId =
+            row?.rm_id ||
+            row?.assigned_rm ||
+            localRm?.rm_id ||
+            (Array.isArray(row?.rm_ids) ? row.rm_ids[0] : "") ||
+            "";
+          const fromUser = rmId
+            ? usersList?.find((u) => String(u.user_id) === String(rmId))
+            : null;
+          const rmName =
+            row?.rm_name ||
+            row?.assigned_rm_name ||
+            row?.assigned_rm_user ||
+            localRm?.rm_name ||
+            fromUser?.user ||
+            fromUser?.name ||
+            fromUser?.email ||
+            "";
+
+          if (!rmName) {
+            return (
+              <span className="fw-bold" style={{ color: "#293790" }}>
+                ---------
+              </span>
+            );
+          }
+
+          return (
+            <button
+              type="button"
+              className="btn btn-link p-0 fw-bold text-decoration-none"
+              style={{ color: "#293790" }}
+              onClick={() => openRmDetailsPopup(row)}
+              title="View assigned RM details"
+            >
+              {rmName}
+            </button>
+          );
         },
       },
     },
@@ -1912,6 +2097,61 @@ const CPRegisterLeadsTable = ({
             {assignRmSaving ? "Saving..." : "SUBMIT"}
           </button>
         </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={showRmDetails}
+        onHide={closeRmDetailsPopup}
+        centered
+        contentClassName="border-0"
+      >
+        <Modal.Header
+          closeButton
+          closeVariant="white"
+          style={{
+            background: clientBtnColor || "#f97316",
+            color: "#fff",
+            borderBottom: "none",
+          }}
+        >
+          <Modal.Title style={{ fontSize: 18, fontWeight: 600 }}>
+            Assigned RM(s) -{" "}
+            {[rmDetailsLead?.first_name, rmDetailsLead?.last_name]
+              .filter(Boolean)
+              .join(" ") || "Lead"}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ background: "#fff", maxHeight: 420, overflowY: "auto" }}>
+          {rmDetailsList.length ? (
+            rmDetailsList.map((rm, idx) => (
+              <div key={rm.user_id || idx} className={idx === 0 ? "" : "mt-3"}>
+                <div
+                  className="fw-bold mb-2"
+                  style={{ color: "#1e3a8a", fontSize: 16 }}
+                >
+                  {rm.name}
+                </div>
+                <div
+                  className="p-3 mb-2"
+                  style={{
+                    background: "#f3f4f6",
+                    borderRadius: 8,
+                    color: "#374151",
+                    fontSize: 14,
+                  }}
+                >
+                  <div>Contact: {rm.contact || "-"}</div>
+                  <div>Email: {rm.email || "-"}</div>
+                </div>
+                <div style={{ color: "#4b5563", fontSize: 14 }}>
+                  RM Location: State: {rm.state || "-"}, City: {rm.city || "-"}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center text-muted py-3">No RM details found</div>
+          )}
+        </Modal.Body>
       </Modal>
     </>
   );

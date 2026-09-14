@@ -279,7 +279,10 @@ const VisitDetailsScreen = () => {
     Boolean(item?.visit_code_sent_at) ||
     Boolean(item?.otp_sent_at) ||
     Boolean(item?.code_sent_at) ||
-    String(item?.visit_status || item?.status || "").toLowerCase().includes("progress");
+    String(item?.visit_status || item?.status || "").toLowerCase().includes("progress") ||
+    String(item?.visit_status || item?.status || "")
+      .toLowerCase()
+      .includes("not completed");
 
   const mapCpVisitRow = (item = {}, lead = {}, index = 0) => {
     const fallbackProject = lead?.project_name || lead?.sales_project_name || "";
@@ -351,10 +354,10 @@ const VisitDetailsScreen = () => {
     const status = isCompleted
       ? "Completed"
       : otpSent
-        ? "In Progress"
+        ? "Not Completed"
         : isScheduled
-          ? "Upcoming"
-          : "Upcoming";
+          ? "Scheduled Visit"
+          : "Scheduled Visit";
     const leadName =
       lead?.name ||
       `${lead?.first_name || ""} ${lead?.last_name || ""}`.trim() ||
@@ -447,7 +450,7 @@ const VisitDetailsScreen = () => {
           override.isCompleted || row.isCompleted
             ? "Completed"
             : override.otpSent || row.otpSent
-              ? "In Progress"
+              ? "Not Completed"
               : override.status || row.status,
         activation_date:
           override.activation_date || row.activation_date || "",
@@ -837,10 +840,10 @@ const VisitDetailsScreen = () => {
             visitData?.visit_verified === true
           )
             ? (visitData?.visit_status || "Completed")
-            : "Upcoming"
+            : "Scheduled Visit"
         )
       )
-    : (visitData?.status || "Upcoming");
+    : (visitData?.status || "Scheduled Visit");
 
   const handleBackToVisits = () => {
     if (isCpVisit) {
@@ -879,7 +882,7 @@ const VisitDetailsScreen = () => {
         } else if (patch.otpSent) {
           next.isCompleted = false;
           next.otpSent = true;
-          next.status = "In Progress";
+          next.status = "Not Completed";
         }
         return next;
       })
@@ -892,7 +895,7 @@ const VisitDetailsScreen = () => {
             status: patch.isCompleted
               ? "Completed"
               : patch.otpSent
-                ? "In Progress"
+                ? "Not Completed"
                 : patch.status || prev.status,
           }
         : prev
@@ -982,7 +985,7 @@ const VisitDetailsScreen = () => {
       markSelectedVisitOverride({
         otpSent: true,
         isCompleted: false,
-        status: "In Progress",
+        status: "Not Completed",
       });
       return true;
     } catch (error) {
@@ -1091,12 +1094,14 @@ const VisitDetailsScreen = () => {
                           const isCompleted = Boolean(row.isCompleted) || statusKey === "completed";
                           const isInProgress =
                             !isCompleted &&
-                            (Boolean(row.otpSent) || statusKey === "in progress");
+                            (Boolean(row.otpSent) ||
+                              statusKey === "in progress" ||
+                              statusKey === "not completed");
                           const statusLabel = isCompleted
                             ? "Completed"
                             : isInProgress
-                              ? "In Progress"
-                              : "Upcoming";
+                              ? "Not Completed"
+                              : "Scheduled Visit";
                           const statusBg = isCompleted
                             ? "#198754"
                             : isInProgress
