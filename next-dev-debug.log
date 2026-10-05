@@ -1,0 +1,544 @@
+ready - started server on 0.0.0.0:3000, url: http://localhost:3000
+info  - Loaded env from C:\Users\Ritik Kumar Kloudrac\Desktop\NK Realtor\FinalChannelPartner_Client\.env
+> [PWA] PWA support is disabled
+> [PWA] PWA support is disabled
+event - compiled client and server successfully in 7.2s (728 modules)
+wait  - compiling / (client and server)...
+event - compiled client and server successfully in 7.5s (1130 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 15.1s (3315 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 2.7s (1923 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 2.4s (1925 modules)
+wait  - compiling /partner (client and server)...
+event - compiled client and server successfully in 1963 ms (3326 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 2.3s (1921 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 274 ms (175 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 2.9s (1935 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling...
+event - compiled client and server successfully in 9.5s (1934 modules)
+wait  - compiling...
+event - compiled client and server successfully in 4.4s (1920 modules)
+wait  - compiling...
+event - compiled client and server successfully in 863 ms (1920 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 155 ms (175 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling...
+event - compiled client and server successfully in 12.3s (1920 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 87 ms (175 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 1599 ms (1921 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 4.5s (3326 modules)
+wait  - compiling /partner/ChannelProfile...
+event - compiled client and server successfully in 1879 ms (1929 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 1424 ms (3326 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 901 ms (3331 modules)
+wait  - compiling /partner/Leads...
+wait  - compiling /partner/Visits...
+wait  - compiling /partner/ActivePartners (client and server)...
+event - compiled client and server successfully in 13.5s (13905 modules)
+event - compiled client and server successfully (13867 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 611 ms (3326 modules)
+wait  - compiling...
+event - compiled client and server successfully in 21.6s (1905 modules)
+wait  - compiling /...
+wait  - compiling /partner...
+event - compiled client and server successfully in 1040 ms (3326 modules)
+wait  - compiling...
+event - compiled client and server successfully in 15.7s (3324 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 1528 ms (1902 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 1375 ms (3312 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+wait  - compiling /partner (client and server)...
+event - compiled client and server successfully in 1521 ms (3286 modules)
+event - compiled client and server successfully (3324 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 1896 ms (3321 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 492 ms (3318 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 3.3s (1918 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 5.6s (3324 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 176 ms (166 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 451 ms (1918 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 1480 ms (3324 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 1397 ms (3318 modules)
+wait  - compiling / (client and server)...
+event - compiled client and server successfully in 2.2s (1918 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 2.5s (3274 modules)
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 3.5s (3315 modules)
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 2.5s (3324 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 537 ms (1910 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 615 ms (1910 modules)
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 1291 ms (3331 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 160 ms (212 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 1890 ms (1916 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 729 ms (1918 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 1015 ms (3274 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 2.6s (3311 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 2.4s (3312 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 1771 ms (1908 modules)
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 797 ms (1917 modules)
+wait  - compiling /partner/ChannelPartnersDetails...
+event - compiled client and server successfully in 8.7s (12465 modules)
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 4s (13888 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 2.2s (3326 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 533 ms (3318 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 84 ms (170 modules)
+wait  - compiling /...
+wait  - compiling /partner (client and server)...
+event - compiled client and server successfully in 1788 ms (3286 modules)
+event - compiled client and server successfully (3324 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 1576 ms (1902 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 998 ms (1909 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 1609 ms (1917 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 335 ms (1141 modules)
+wait  - compiling /setting...
+event - compiled client and server successfully in 2.7s (2225 modules)
+wait  - compiling /ZoneManagement...
+event - compiled client and server successfully in 424 ms (2225 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 54 ms (189 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 554 ms (1156 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 3.5s (3300 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 2.2s (3329 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 1151 ms (3331 modules)
+wait  - compiling /partner/Leads...
+event - compiled client and server successfully in 8.1s (12470 modules)
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 2.5s (12461 modules)
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 946 ms (12470 modules)
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 1861 ms (3285 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 447 ms (3311 modules)
+wait  - compiling /...
+wait  - compiling /partner (client and server)...
+event - compiled client and server successfully in 1165 ms (3286 modules)
+event - compiled client and server successfully (3324 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 1534 ms (3309 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 309 ms (1910 modules)
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 1635 ms (1908 modules)
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 304 ms (1901 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 511 ms (1910 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 298 ms (1141 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 1666 ms (3285 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 591 ms (3309 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 1523 ms (1910 modules)
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 1177 ms (3331 modules)
+wait  - compiling /partner/ChannelProfile...
+event - compiled client and server successfully in 1099 ms (1919 modules)
+wait  - compiling /partner/Campaign...
+event - compiled client and server successfully in 10.1s (12463 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 952 ms (12467 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 511 ms (1910 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 380 ms (1916 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 1181 ms (3322 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 735 ms (3331 modules)
+wait  - compiling /partner/ChannelPartnersDetails...
+event - compiled client and server successfully in 5.1s (12465 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 1638 ms (12470 modules)
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 1905 ms (1908 modules)
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 1150 ms (1917 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 322 ms (1916 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 3.3s (3322 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 457 ms (3324 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/Leads...
+event - compiled client and server successfully in 7.6s (13862 modules)
+wait  - compiling /partner/LeadDetails...
+event - compiled client and server successfully in 2.2s (12459 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 1113 ms (12469 modules)
+wait  - compiling /partner...
+event - compiled client and server successfully in 1369 ms (13875 modules)
+wait  - compiling /partner/LeadDetails...
+event - compiled client and server successfully in 1128 ms (12459 modules)
+wait  - compiling /...
+event - compiled client and server successfully in 1319 ms (12469 modules)
+wait  - compiling /setting...
+event - compiled client and server successfully in 2.7s (13373 modules)
+wait  - compiling /ZoneManagement...
+event - compiled client and server successfully in 1728 ms (13372 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 46 ms (189 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/NewRegistration (client and server)...
+event - compiled client and server successfully in 1377 ms (813 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 2.2s (1193 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 3.1s (3298 modules)
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 1691 ms (3316 modules)
+wait  - compiling /partner/PendingRequests...
+event - compiled client and server successfully in 1888 ms (1910 modules)
+wait  - compiling /partner/ActivePartners...
+event - compiled client and server successfully in 1443 ms (1910 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 1288 ms (1902 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 367 ms (1911 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+wait  - compiling /partner...
+event - compiled client and server successfully in 2.9s (3324 modules)
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 140 ms (206 modules)
+wait  - compiling /partner/ChannelPartnersDetails...
+event - compiled client and server successfully in 9.1s (12465 modules)
+wait  - compiling /partner/ChannelProfile...
+event - compiled client and server successfully in 1385 ms (1910 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 417 ms (1911 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+event - compiled client and server successfully in 1420 ms (3311 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 571 ms (3312 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling...
+event - compiled client and server successfully in 17.6s (1901 modules)
+wait  - compiling /partner/ChannelPartnersDetails...
+event - compiled client and server successfully in 146.7s (12465 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /...
+event - compiled client and server successfully in 2.2s (1918 modules)
+wait  - compiling /partner...
+wait  - compiling /partner/CPRegisterLeads...
+event - compiled client and server successfully in 29.5s (3327 modules)
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 718 ms (1904 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/CPRegisterLeads...
+wait  - compiling / (client and server)...
+event - compiled client and server successfully in 837 ms (1921 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /_error (client and server)...
+event - compiled client and server successfully in 2.2s (1922 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 2.9s (3323 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /api/public-zones (client and server)...
+event - compiled successfully in 363 ms (194 modules)
+wait  - compiling /partner/ChannelPartnersDetails...
+wait  - compiling / (client and server)...
+event - compiled client and server successfully in 40.8s (12505 modules)
+event - compiled client and server successfully (12511 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner/CPRegisterLeads...
+wait  - compiling / (client and server)...
+event - compiled client and server successfully in 971 ms (1918 modules)
+event - compiled client and server successfully (1925 modules)
+initialState {
+  value: 'dark',
+  side: '#405189',
+  buttons: '#405189',
+  topnav: '#405189'
+} undefined
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 2.6s (3319 modules)
+wait  - compiling /partner/Visits...
+event - compiled client and server successfully in 3s (1940 modules)
+wait  - compiling /partner/VisitDetails...
+event - compiled client and server successfully in 992 ms (1909 modules)
+wait  - compiling /partner...
+wait  - compiling /...
+event - compiled client and server successfully in 3.9s (3319 modules)
+wait  - compiling /api/public-zones (client and server)...
+wait  - compiling /partner/CPRegisterLeads...

@@ -77,28 +77,13 @@ export default function ChannelSignInScreen({ setLoggedIn }) {
       dispatch(stopLoading())
     } else {
       try {
-        const clientUrl = "http://18.61.246.105";
-        let baseUrl = window.location.origin;
-
-        // Treat localhost / LAN URLs as development, don't send client_url there
-        const isLocalDev =
-          baseUrl === "http://localhost:3000" ||
-          baseUrl.startsWith("http://10.") ||
-          baseUrl.startsWith("http://192.168.") ||
-          baseUrl.startsWith("http://172.");
-
-        const payload = isLocalDev
-          ? {
-              email: userForm.email.toLowerCase(),
-              password: userForm.password,
-              type: "partner",
-            }
-          : {
-              email: userForm.email.toLowerCase(),
-              password: userForm.password,
-              type: "partner",
-              client_url: clientUrl,
-            };
+        const clientUrl = Baseurl.replace(/\/api\/v1\/?$/, "");
+        const payload = {
+          email: userForm.email.toLowerCase(),
+          password: userForm.password,
+          type: "partner",
+          client_url: clientUrl,
+        };
 
         const res = await axios.post(Baseurl + "/db/login", payload);
 

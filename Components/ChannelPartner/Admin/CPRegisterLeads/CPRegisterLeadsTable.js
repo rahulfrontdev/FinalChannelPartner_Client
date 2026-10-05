@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import MUIDataTable from "mui-datatables";
 import Link from "next/link";
 import { Baseurl, filesUrl, isRmRole, isBstRole, getVisitDateLabel, showCpVisitScheduleColumns } from "../../../../Utils/Constants";
@@ -11,42 +11,11 @@ import DeleteIcon from "../../../Svg/DeleteIcon";
 import EditIcon from "../../../Svg/EditIcon";
 import moment from "moment";
 import DateRange from "../../../DateRangeCustom/Daterange";
-import Select, { components } from 'react-select';
+import Select from 'react-select';
 import { fetchData } from '../../../../Utils/getReq';
 import ViewIcon from "../../../Svg/ViewIcon";
 import { useRouter } from "next/router";
 import * as XLSX from "xlsx";
-
-const CheckboxSelectOption = (props) => {
-  const { isFocused, isSelected, children, innerProps, getStyles, isDisabled, ...rest } =
-    props;
-  let bg = "transparent";
-  if (isFocused) bg = "#eee";
-  if (isSelected) bg = "#B2D4FF";
-
-  return (
-    <components.Option
-      {...rest}
-      isDisabled={isDisabled}
-      isFocused={isFocused}
-      isSelected={isSelected}
-      getStyles={getStyles}
-      innerProps={{
-        ...innerProps,
-        style: {
-          alignItems: "center",
-          backgroundColor: bg,
-          color: "inherit",
-          display: "flex",
-          gap: 8,
-        },
-      }}
-    >
-      <input type="checkbox" checked={!!isSelected} readOnly style={{ marginRight: 8 }} />
-      {children}
-    </components.Option>
-  );
-};
 
 const CPRegisterLeadsTable = ({
   deleteConfirm,
@@ -96,16 +65,6 @@ const CPRegisterLeadsTable = ({
     visit_type: ""
   });
   const [projectList, setProjectList] = useState([]);
-  const [pmProjectList, setPmProjectList] = useState([]);
-  const [showAssignRm, setShowAssignRm] = useState(false);
-  const [assignRmLead, setAssignRmLead] = useState(null);
-  const [selectedAssignProjects, setSelectedAssignProjects] = useState([]);
-  const [selectedAssignRms, setSelectedAssignRms] = useState([]);
-  const [assignRmSaving, setAssignRmSaving] = useState(false);
-  const [rmAssignMap, setRmAssignMap] = useState({});
-  const [showRmDetails, setShowRmDetails] = useState(false);
-  const [rmDetailsLead, setRmDetailsLead] = useState(null);
-  const [rmDetailsList, setRmDetailsList] = useState([]);
   const visitTypeOptions = [
     { value: "Video Visit", label: "Video Visit" },
     { value: "Site Visit", label: "Site Visit" },
@@ -148,302 +107,10 @@ const CPRegisterLeadsTable = ({
     }
   };
 
-  const extractPmList = (payload) => {
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.records)) return payload.records;
-    if (Array.isArray(payload?.data)) return payload.data;
-    if (Array.isArray(payload?.projects)) return payload.projects;
-    return [];
-  };
-
-  const getPmProjectList = async () => {
-    if (!hasCookie("token")) return;
-    const token = getCookie("token");
-    const db_name = getCookie("db_name");
-    try {
-      const { data } = await axios.get(`${Baseurl}/db/channel/project-master`, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-          db: db_name,
-          pass: "pass",
-        },
-      });
-      const list = extractPmList(data?.data ?? data).map((item) => {
-        const rmUsers = Array.isArray(item?.bst_users)
-          ? item.bst_users
-          : Array.isArray(item?.rm_users)
-            ? item.rm_users
-            : [];
-        const rmIds = Array.isArray(item?.rm_ids)
-          ? item.rm_ids.map(String)
-          : Array.isArray(item?.bst_ids)
-            ? item.bst_ids.map(String)
-            : rmUsers
-                .map((u) => u?.user_id || u?.id)
-                .filter(Boolean)
-                .map(String);
-        return {
-          project_id: item?.project_id || item?.id || "",
-          project_name: item?.project_name || item?.project || item?.name || "",
-          rm_ids: rmIds,
-          rm_users: rmUsers,
-        };
-      });
-      setPmProjectList(list.filter((p) => p.project_id));
-    } catch (error) {
-      setPmProjectList([]);
-    }
-  };
-
   useEffect(() => {
     getUsersList();
     getProjectList();
-    getPmProjectList();
-    try {
-      const saved = localStorage.getItem("cpLeadRmAssignMap");
-      if (saved) setRmAssignMap(JSON.parse(saved) || {});
-    } catch (e) {
-      setRmAssignMap({});
-    }
-  }, [])
-
-  const saveRmAssignMap = (nextMap) => {
-    setRmAssignMap(nextMap);
-    try {
-      localStorage.setItem("cpLeadRmAssignMap", JSON.stringify(nextMap));
-    } catch (e) {
-      // ignore storage errors
-    }
-  };
-  const pmProjectOptions = useMemo(
-    () =>
-      pmProjectList.map((p) => ({
-        value: String(p.project_id),
-        label: p.project_name || `Project ${p.project_id}`,
-      })),
-    [pmProjectList]
-  );
-
-  const assignRmOptions = useMemo(() => {
-    if (!selectedAssignProjects.length) return [];
-    const selectedIds = selectedAssignProjects.map((p) => String(p.value));
-    const selectedProjects = pmProjectList.filter((p) =>
-      selectedIds.includes(String(p.project_id))
-    );
-
-    const rmMap = new Map();
-    selectedProjects.forEach((project) => {
-      (project.rm_users || []).forEach((u) => {
-        const id = String(u?.user_id || u?.id || "");
-        if (!id) return;
-        rmMap.set(id, {
-          value: id,
-          label: u?.user || u?.name || u?.email || `User ${id}`,
-        });
-      });
-      (project.rm_ids || []).forEach((id) => {
-        const key = String(id);
-        if (rmMap.has(key)) return;
-        const user = usersList?.find((u) => String(u.user_id) === key);
-        rmMap.set(key, {
-          value: key,
-          label: user?.user || user?.name || user?.email || `User ${key}`,
-        });
-      });
-    });
-
-    return Array.from(rmMap.values());
-  }, [selectedAssignProjects, pmProjectList, usersList]);
-
-  const openAssignRmModal = (lead) => {
-    setAssignRmLead(lead || null);
-    setSelectedAssignProjects([]);
-    setSelectedAssignRms([]);
-    setShowAssignRm(true);
-    if (!pmProjectList.length) getPmProjectList();
-  };
-
-  const closeAssignRmModal = () => {
-    setShowAssignRm(false);
-    setAssignRmLead(null);
-    setSelectedAssignProjects([]);
-    setSelectedAssignRms([]);
-  };
-
-  const getUserLocation = (user = {}) => {
-    const state =
-      user?.db_state?.state_name ||
-      user?.state_name ||
-      (typeof user?.state === "string" ? user.state : "") ||
-      user?.userState?.state_name ||
-      user?.db_user_state?.state_name ||
-      "-";
-    const city =
-      user?.db_city?.city_name ||
-      user?.city_name ||
-      (typeof user?.city === "string" ? user.city : "") ||
-      user?.userCity?.city_name ||
-      user?.db_user_city?.city_name ||
-      "-";
-    return { state: state || "-", city: city || "-" };
-  };
-
-  const resolveAssignedRmsForLead = (lead = {}) => {
-    const localRm = rmAssignMap?.[String(lead?.cpl_id)] || {};
-    let ids = [];
-
-    if (Array.isArray(lead?.rm_ids) && lead.rm_ids.length) {
-      ids = lead.rm_ids.map(String);
-    } else if (Array.isArray(localRm?.rm_ids) && localRm.rm_ids.length) {
-      ids = localRm.rm_ids.map(String);
-    } else if (lead?.rm_id || lead?.assigned_rm || localRm?.rm_id) {
-      ids = [String(lead?.rm_id || lead?.assigned_rm || localRm?.rm_id)];
-    }
-
-    // Fallback: parse names if only names are stored
-    if (!ids.length) {
-      const nameStr =
-        lead?.rm_name ||
-        lead?.assigned_rm_name ||
-        localRm?.rm_name ||
-        "";
-      const names = String(nameStr)
-        .split(",")
-        .map((n) => n.trim())
-        .filter(Boolean);
-      return names.map((name) => {
-        const lower = name.toLowerCase();
-        const user = usersList?.find((u) => {
-          const uName = String(u?.user || u?.name || "").toLowerCase().trim();
-          if (!uName) return false;
-          return (
-            uName === lower ||
-            uName.includes(lower) ||
-            lower.includes(uName) ||
-            String(u?.email || "").toLowerCase() === lower
-          );
-        });
-        const loc = getUserLocation(user || {});
-        return {
-          user_id: user?.user_id || "",
-          name: user?.user || user?.name || name,
-          contact:
-            user?.contact_number || user?.contact || user?.phone || "-",
-          email: user?.email || "-",
-          state: loc.state,
-          city: loc.city,
-        };
-      });
-    }
-
-    return ids.map((id) => {
-      const user = usersList?.find((u) => String(u.user_id) === String(id));
-      const loc = getUserLocation(user || {});
-      return {
-        user_id: id,
-        name: user?.user || user?.name || user?.email || `User ${id}`,
-        contact: user?.contact_number || user?.contact || user?.phone || "-",
-        email: user?.email || "-",
-        state: loc.state,
-        city: loc.city,
-      };
-    });
-  };
-
-  const openRmDetailsPopup = (lead) => {
-    const list = resolveAssignedRmsForLead(lead);
-    if (!list.length) return;
-    setRmDetailsLead(lead);
-    setRmDetailsList(list);
-    setShowRmDetails(true);
-  };
-
-  const closeRmDetailsPopup = () => {
-    setShowRmDetails(false);
-    setRmDetailsLead(null);
-    setRmDetailsList([]);
-  };
-
-  const submitAssignRm = async () => {
-    if (!assignRmLead?.cpl_id) {
-      toast.error("Lead not found", { autoClose: 2500 });
-      return;
-    }
-    if (!selectedAssignProjects.length) {
-      toast.error("Please select at least one project", { autoClose: 2500 });
-      return;
-    }
-    if (!selectedAssignRms.length) {
-      toast.error("Please select at least one RM", { autoClose: 2500 });
-      return;
-    }
-    if (!hasCookie("token")) return;
-
-    const token = getCookie("token");
-    const db_name = getCookie("db_name");
-    const primaryRm = selectedAssignRms[0];
-    const primaryProject = selectedAssignProjects[0];
-    const rmId = Number(primaryRm.value) || primaryRm.value;
-    const rmIds = selectedAssignRms.map((r) => Number(r.value) || r.value);
-    const projectIds = selectedAssignProjects.map(
-      (p) => Number(p.value) || p.value
-    );
-    const rmName =
-      selectedAssignRms.map((r) => r.label).filter(Boolean).join(", ") ||
-      primaryRm.label;
-
-    const payload = {
-      cpl_id: Number(assignRmLead.cpl_id) || assignRmLead.cpl_id,
-      db_name,
-      project_id: Number(primaryProject.value) || primaryProject.value,
-      project_ids: projectIds,
-      rm_id: rmId,
-      rm_ids: rmIds,
-      assigned_rm: rmId,
-      rm_name: rmName,
-      assigned_rm_name: rmName,
-    };
-
-    setAssignRmSaving(true);
-    try {
-      const response = await axios.post(
-        `${Baseurl}/db/channelPartnerLeads/assign-rm`,
-        payload,
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-            db: db_name,
-            pass: "pass",
-          },
-        }
-      );
-      if (response.status === 200 || response.status === 201) {
-        const nextMap = {
-          ...rmAssignMap,
-          [String(assignRmLead.cpl_id)]: {
-            rm_id: rmId,
-            rm_ids: rmIds,
-            rm_name: rmName,
-          },
-        };
-        saveRmAssignMap(nextMap);
-        toast.success(response?.data?.message || "Assigned to RM successfully", {
-          autoClose: 2500,
-        });
-        closeAssignRmModal();
-        await getDataList();
-      }
-    } catch (error) {
-      toast.error(
-        error?.response?.data?.message || "Failed to assign RM",
-        { autoClose: 2500 }
-      );
-    } finally {
-      setAssignRmSaving(false);
-    }
-  };
+  }, []);
 
   const getCurrentWeekDates = () => {
     const startDate = new Date(new Date().setDate(new Date().getDate() - new Date().getDay() + 1));
@@ -776,6 +443,7 @@ const CPRegisterLeadsTable = ({
         formatDate(lead.createdAt),
         lead.follow_up_date ? formatDate(lead.follow_up_date) : "",
         lead.operating_location || "",
+        lead.zone_name || lead.zone?.zone_name || lead.db_zone?.zone_name || "",
         lead.city || "",
         lead.state || "",
         lead.group || "",
@@ -794,7 +462,7 @@ const CPRegisterLeadsTable = ({
         [`Date Range: ${range?.f_date ? formatDate(range?.f_date) : formatDate(start)} to ${range?.t_date ? formatDate(range?.t_date) : formatDate(end)}`],
         [],
         [],
-        ["First Name", "Last Name", "Email", "Contact", "Registration Date", "Date", "Operating Location", "City", "State", "group", "Designation", "Status", "Assigned To", "Latest Remarks", "Remarks (All History)"],
+        ["First Name", "Last Name", "Email", "Contact", "Registration Date", "Date", "Operating Location", "Zone", "City", "State", "group", "Designation", "Status", "Assigned To", "Latest Remarks", "Remarks (All History)"],
         ...excelData,
       ];
 
@@ -814,6 +482,7 @@ const CPRegisterLeadsTable = ({
         { wch: 20 },
         { wch: 20 },
         { wch: 20 }, // operating location
+        { wch: 18 }, // zone
         { wch: 15 }, // city
         { wch: 15 }, // state
         { wch: 15 }, // group
@@ -939,6 +608,29 @@ const CPRegisterLeadsTable = ({
     {
       name: "operating_location",
       label: "Operating Location",
+      options: {
+        filter: false,
+        customHeadRender: (columnMeta, updateDirection) => (
+          <th style={headerCellStyle}>
+            {columnMeta.label}
+          </th>
+        ),
+
+        customBodyRender: (value, tableMeta, updateValue) => {
+          return (
+            <span
+              className="fw-bold"
+              style={{ color: '#293790' }}
+            >
+              {value || "-"}
+            </span>
+          )
+        },
+      },
+    },
+    {
+      name: "zone_name",
+      label: "Zone",
       options: {
         filter: false,
         customHeadRender: (columnMeta, updateDirection) => (
@@ -1148,61 +840,6 @@ const CPRegisterLeadsTable = ({
         },
       },
     },
-    {
-      name: "rm_name",
-      label: "Assign To RM",
-      options: {
-        filter: true,
-        display: (userInfo?.isDB || userInfo?.role_id == 3) ? true : false,
-        customHeadRender: (columnMeta, updateDirection) => (
-          <th style={headerCellStyle}>
-            {columnMeta.label}
-          </th>
-        ),
-        customBodyRenderLite: (dataIndex) => {
-          const row = dataList?.[dataIndex] || {};
-          const localRm = rmAssignMap?.[String(row?.cpl_id)] || {};
-          const rmId =
-            row?.rm_id ||
-            row?.assigned_rm ||
-            localRm?.rm_id ||
-            (Array.isArray(row?.rm_ids) ? row.rm_ids[0] : "") ||
-            "";
-          const fromUser = rmId
-            ? usersList?.find((u) => String(u.user_id) === String(rmId))
-            : null;
-          const rmName =
-            row?.rm_name ||
-            row?.assigned_rm_name ||
-            row?.assigned_rm_user ||
-            localRm?.rm_name ||
-            fromUser?.user ||
-            fromUser?.name ||
-            fromUser?.email ||
-            "";
-
-          if (!rmName) {
-            return (
-              <span className="fw-bold" style={{ color: "#293790" }}>
-                ---------
-              </span>
-            );
-          }
-
-          return (
-            <button
-              type="button"
-              className="btn btn-link p-0 fw-bold text-decoration-none"
-              style={{ color: "#293790" }}
-              onClick={() => openRmDetailsPopup(row)}
-              title="View assigned RM details"
-            >
-              {rmName}
-            </button>
-          );
-        },
-      },
-    },
     // {
     //   name: "remarks",
     //   label: "Remarks",
@@ -1250,7 +887,7 @@ const CPRegisterLeadsTable = ({
                   flexDirection: "row",
                   flexWrap: "nowrap",
                   alignItems: "center",
-                  minWidth: 320,
+                  minWidth: 220,
                 }}
               >
                 <>
@@ -1325,20 +962,6 @@ const CPRegisterLeadsTable = ({
                       }}
                       title='Assign - To'>
                       Assign to
-                    </button>
-                    <button
-                      onClick={() => openAssignRmModal(leadData)}
-                      style={{
-                        background: clientBtnColor ? clientBtnColor : `#293790`,
-                        color: "white",
-                        padding: "6px 12px",
-                        borderRadius: "20px",
-                        border: "white",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                      title='Assign TO RM'>
-                      Assign TO RM
                     </button>
                   </div>
                 )}
@@ -1555,7 +1178,10 @@ const CPRegisterLeadsTable = ({
             <div className="miuiTable channelTable">
               <MUIDataTable
                 title={<CustomToolbar />}
-                data={Array.isArray(dataList) ? dataList : []}
+                data={(Array.isArray(dataList) ? dataList : []).map((lead) => ({
+                  ...lead,
+                  zone_name: lead?.zone_name || lead?.zone?.zone_name || lead?.db_zone?.zone_name || "",
+                }))}
                 columns={columns}
                 // options={options}
                 options={{
@@ -1994,165 +1620,6 @@ const CPRegisterLeadsTable = ({
         </Modal.Footer>
       </Modal>
 
-      <Modal
-        className="commonModal"
-        show={showAssignRm}
-        onHide={closeAssignRmModal}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Assign Projects</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="add_user_form">
-            <div className="row g-3">
-              <div className="col-12">
-                <div className="input_box">
-                  <label className="form-label">Projects</label>
-                  <Select
-                    isMulti
-                    isSearchable
-                    closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-                    placeholder="Select projects"
-                    options={pmProjectOptions}
-                    value={selectedAssignProjects}
-                    onChange={(options) => {
-                      setSelectedAssignProjects(options || []);
-                      setSelectedAssignRms([]);
-                    }}
-                    components={{ Option: CheckboxSelectOption }}
-                    noOptionsMessage={() => "No projects found"}
-                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                    styles={{
-                      control: (base) => ({ ...base, minHeight: 38 }),
-                      menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      option: (base) => ({
-                        ...base,
-                        paddingTop: 8,
-                        paddingBottom: 8,
-                      }),
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="col-12">
-                <div className="input_box">
-                  <label className="form-label">RM(s)</label>
-                  <Select
-                    isMulti
-                    isSearchable
-                    closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-                    isDisabled={!selectedAssignProjects.length}
-                    placeholder={
-                      selectedAssignProjects.length
-                        ? "Select RM(s) from selected projects"
-                        : "Select project first"
-                    }
-                    options={assignRmOptions}
-                    value={selectedAssignRms}
-                    onChange={(options) => setSelectedAssignRms(options || [])}
-                    components={{ Option: CheckboxSelectOption }}
-                    noOptionsMessage={() =>
-                      selectedAssignProjects.length
-                        ? "No RM found for selected project"
-                        : "Select project first"
-                    }
-                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        minHeight: 38,
-                        backgroundColor: selectedAssignProjects.length ? "#fff" : "#f1f3f5",
-                      }),
-                      menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      option: (base) => ({
-                        ...base,
-                        paddingTop: 8,
-                        paddingBottom: 8,
-                      }),
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <button
-            className="btn btn-danger rounded-5"
-            onClick={closeAssignRmModal}
-            disabled={assignRmSaving}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn rounded-5 text-white"
-            style={{ background: clientBtnColor || "#000" }}
-            onClick={submitAssignRm}
-            disabled={assignRmSaving}
-          >
-            {assignRmSaving ? "Saving..." : "SUBMIT"}
-          </button>
-        </Modal.Footer>
-      </Modal>
-
-      <Modal
-        show={showRmDetails}
-        onHide={closeRmDetailsPopup}
-        centered
-        contentClassName="border-0"
-      >
-        <Modal.Header
-          closeButton
-          closeVariant="white"
-          style={{
-            background: clientBtnColor || "#f97316",
-            color: "#fff",
-            borderBottom: "none",
-          }}
-        >
-          <Modal.Title style={{ fontSize: 18, fontWeight: 600 }}>
-            Assigned RM(s) -{" "}
-            {[rmDetailsLead?.first_name, rmDetailsLead?.last_name]
-              .filter(Boolean)
-              .join(" ") || "Lead"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ background: "#fff", maxHeight: 420, overflowY: "auto" }}>
-          {rmDetailsList.length ? (
-            rmDetailsList.map((rm, idx) => (
-              <div key={rm.user_id || idx} className={idx === 0 ? "" : "mt-3"}>
-                <div
-                  className="fw-bold mb-2"
-                  style={{ color: "#1e3a8a", fontSize: 16 }}
-                >
-                  {rm.name}
-                </div>
-                <div
-                  className="p-3 mb-2"
-                  style={{
-                    background: "#f3f4f6",
-                    borderRadius: 8,
-                    color: "#374151",
-                    fontSize: 14,
-                  }}
-                >
-                  <div>Contact: {rm.contact || "-"}</div>
-                  <div>Email: {rm.email || "-"}</div>
-                </div>
-                <div style={{ color: "#4b5563", fontSize: 14 }}>
-                  RM Location: State: {rm.state || "-"}, City: {rm.city || "-"}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center text-muted py-3">No RM details found</div>
-          )}
-        </Modal.Body>
-      </Modal>
     </>
   );
 };

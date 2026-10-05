@@ -1079,8 +1079,8 @@ const VisitDetailsScreen = () => {
                         <th>Project Name</th>
                         <th>Scheduled Date</th>
                         <th>Scheduled Time</th>
-                        <th>Activation Date</th>
-                        <th>Activation Time</th>
+                        <th>Orientation Date</th>
+                        <th>Orientation Time</th>
                         <th>Visit Type</th>
                         <th>Assigned To</th>
                         <th>Status</th>

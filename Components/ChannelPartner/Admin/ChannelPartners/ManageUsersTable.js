@@ -3,9 +3,10 @@ import MUIDataTable from "mui-datatables";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button, Modal } from 'react-bootstrap';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
 import axios from 'axios';
 import { Baseurl, isRmRole, isBstRole } from '../../../../Utils/Constants';
+import { getZoneList } from '../../../../Utils/zoneMasterApi';
 import { getCookie, hasCookie, setCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
 import DateRange from '../../../DateRangeCustom/Daterange';
@@ -18,6 +19,36 @@ import EditIcon from "../../../Svg/EditIcon";
 import ViewIcon from "../../../Svg/ViewIcon";
 
 
+
+const CheckboxOption = (props) => {
+  const { isFocused, isSelected, children, innerProps, getStyles, isDisabled, ...rest } = props;
+  let bg = "transparent";
+  if (isFocused) bg = "#eee";
+  if (isSelected) bg = "#B2D4FF";
+
+  return (
+    <components.Option
+      {...rest}
+      isDisabled={isDisabled}
+      isFocused={isFocused}
+      isSelected={isSelected}
+      getStyles={getStyles}
+      innerProps={{
+        ...innerProps,
+        style: {
+          alignItems: "center",
+          backgroundColor: bg,
+          color: "inherit",
+          display: "flex",
+          gap: 8,
+        },
+      }}
+    >
+      <input type="checkbox" checked={isSelected} readOnly style={{ marginRight: 8 }} />
+      {children}
+    </components.Option>
+  );
+};
 
 const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo, setoldAssignTo, oldAssignToRm, setoldAssignToRm, setShowDateFilter, usersList, getDataList, loader, selectedOption, setSelectedOption, channelPartnerFilter }) => {
   const router = useRouter()
@@ -43,6 +74,23 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const clientBtnColor = hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#293790"
   const [partnerTypes, setPartnerTypes] = useState([])
   const [errorToast, setErrorToast] = useState(false);
+  const [showAssignRm, setShowAssignRm] = useState(false);
+  const [assignRmUserId, setAssignRmUserId] = useState("");
+  const [zoneList, setZoneList] = useState([]);
+  const [projectList, setProjectList] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState([]);
+  const [selectedRmIds, setSelectedRmIds] = useState([]);
+  const [assignRmSaving, setAssignRmSaving] = useState(false);
+  const [assignmentMap, setAssignmentMap] = useState({});
+  const [assignmentDetails, setAssignmentDetails] = useState({});
+  const [currentAssignments, setCurrentAssignments] = useState([]);
+  const [rmDetailsShow, setRmDetailsShow] = useState(false);
+  const [rmDetailsRows, setRmDetailsRows] = useState([]);
+  const isBstProfile = isBstRole(userInfo?.role_id);
+  const CP_PROJECT_ASSIGN_API = `${Baseurl}/db/channel/cp-project-assign`;
+  const PROJECT_MASTER_API = `${Baseurl}/db/channel/project-master`;
 
 
   async function getPartnerTypes() {
@@ -129,6 +177,361 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     return null;
   };
 
+  const authHeader = () => {
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    return {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        db: db_name,
+        pass: "pass",
+      },
+    };
+  };
+
+  const formatAssignmentNames = (assignments = []) => {
+    const names = assignments.flatMap((item) => {
+      if (Array.isArray(item?.rm_names) && item.rm_names.length) return item.rm_names;
+      if (item?.rm_name) return String(item.rm_name).split(",").map((name) => name.trim());
+      if (Array.isArray(item?.rm_users)) return item.rm_users.map((user) => user?.name || user?.user);
+      return [];
+    }).map((name) => String(name || "").trim()).filter(Boolean);
+    return [...new Set(names)].join(", ");
+  };
+
+  const rmNamesFromUser = (list) => {
+    if (Array.isArray(list?.assigned_rm) && list.assigned_rm.length) {
+      const fromAssignments = formatAssignmentNames(list.assigned_rm);
+      if (fromAssignments) return fromAssignments;
+    }
+    if (Array.isArray(list?.assigned_rm_users) && list.assigned_rm_users.length) {
+      return [...new Set(
+        list.assigned_rm_users
+          .map((user) => String(user?.name || user?.user || "").trim())
+          .filter(Boolean)
+      )].join(", ");
+    }
+    return "";
+  };
+
+  const applyAssignments = (userId, assignments = []) => {
+    setCurrentAssignments(assignments);
+    setAssignmentMap((prev) => ({
+      ...prev,
+      [userId]: formatAssignmentNames(assignments),
+    }));
+    setAssignmentDetails((prev) => ({
+      ...prev,
+      [userId]: assignments,
+    }));
+  };
+
+  const buildRmRows = (assignments = [], onlyName = "") => {
+    const rows = assignments.flatMap((item) => {
+      const users = Array.isArray(item?.rm_users) && item.rm_users.length
+        ? item.rm_users
+        : (Array.isArray(item?.rm_names) ? item.rm_names : String(item?.rm_name || "").split(","))
+            .map((name, index) => ({
+              user_id: item?.rm_ids?.[index],
+              name: String(name || "").trim(),
+            }))
+            .filter((user) => user.name);
+      return users.map((user) => ({
+        user_id: user?.user_id || user?.id || "-",
+        name: user?.name || user?.user || "-",
+        zone: user?.zone || user?.zone_name || item?.zone || "-",
+        state:
+          user?.state_name ||
+          (typeof user?.state === "string" ? user.state : "") ||
+          item?.projectState?.state_name ||
+          item?.state_name ||
+          "-",
+        city:
+          user?.city_name ||
+          (typeof user?.city === "string" ? user.city : "") ||
+          item?.projectCity?.city_name ||
+          item?.city_name ||
+          "-",
+        project_id: item?.project_id,
+        zone_name: item?.zone || "",
+      }));
+    });
+    if (!onlyName) return rows;
+    return rows.filter((row) => String(row.name).trim().toLowerCase() === String(onlyName).trim().toLowerCase());
+  };
+
+  const enrichRmRows = async (rows, assignments) => {
+    const zones = [...new Set(assignments.map((item) => item?.zone).filter(Boolean))];
+    if (!zones.length || !hasCookie("token")) return rows;
+    const projects = [];
+    await Promise.all(
+      zones.map(async (zone) => {
+        try {
+          const { data } = await axios.get(
+            `${PROJECT_MASTER_API}?zone=${encodeURIComponent(zone)}`,
+            authHeader()
+          );
+          const raw = Array.isArray(data?.data) ? data.data : [];
+          projects.push(...raw);
+        } catch (error) {
+          // keep the assignment fields already available
+        }
+      })
+    );
+    return rows.map((row) => {
+      const project = projects.find((item) => String(item?.project_id) === String(row.project_id));
+      const user = (project?.rm_users || []).find((item) => String(item?.user_id) === String(row.user_id));
+      return {
+        ...row,
+        zone: row.zone && row.zone !== "-" ? row.zone : project?.zone || row.zone,
+        state: row.state && row.state !== "-" ? row.state : user?.state || project?.projectState?.state_name || row.state,
+        city: row.city && row.city !== "-" ? row.city : user?.city || project?.projectCity?.city_name || row.city,
+      };
+    });
+  };
+
+  const openRmDetails = async (cpUserId, rmName) => {
+    const fromList = dataList?.find((item) => String(item?.user_id) === String(cpUserId));
+    const stored = assignmentDetails[cpUserId];
+    const assignments = Array.isArray(stored) && stored.length
+      ? stored
+      : (Array.isArray(fromList?.assigned_rm) ? fromList.assigned_rm : []);
+    let rows = buildRmRows(assignments, rmName);
+    if (rows.some((row) => !row.state || row.state === "-" || !row.city || row.city === "-")) {
+      rows = await enrichRmRows(rows, assignments);
+    }
+    setRmDetailsRows(rows);
+    setRmDetailsShow(true);
+  };
+
+  const normalizeProject = (item = {}) => {
+    const rmUsers = (Array.isArray(item?.rm_users) ? item.rm_users : [])
+      .map((user) => ({
+        user_id: user?.user_id || user?.id,
+        name: user?.name || user?.user || "",
+      }))
+      .filter((user) => user.user_id);
+    const rmIds = rmUsers.length
+      ? rmUsers.map((user) => String(user.user_id))
+      : Array.isArray(item?.rm_ids)
+        ? item.rm_ids.map(String)
+        : [];
+    const rmNames = Array.isArray(item?.rm_names)
+      ? item.rm_names
+      : item?.rm_name
+        ? String(item.rm_name).split(",").map((name) => name.trim()).filter(Boolean)
+        : rmUsers.map((user) => user.name).filter(Boolean);
+    const users = rmUsers.length
+      ? rmUsers
+      : rmIds.map((id, index) => ({ user_id: id, name: rmNames[index] || `RM ${id}` }));
+    return {
+      project_id: item?.project_id || item?.id || "",
+      project_name: item?.project || item?.project_name || item?.name || "",
+      zone: item?.zone || item?.zone_name || "",
+      rm_users: users,
+      rm_ids: users.map((user) => String(user.user_id)),
+      rm_name: (item?.rm_name || rmNames.join(", ")).trim(),
+    };
+  };
+
+  const loadZones = async () => {
+    if (!hasCookie("token")) return;
+    try {
+      const zones = await getZoneList(authHeader());
+      setZoneList(zones.filter((zone) => zone.status !== false && zone.zone_name));
+    } catch (error) {
+      setZoneList([]);
+      toast.error(error?.response?.data?.message || "Failed to load zones", { autoClose: 2500 });
+    }
+  };
+
+  const loadProjectsByZone = async (zone) => {
+    setProjectList([]);
+    setSelectedProjectIds([]);
+    setSelectedRmIds([]);
+    if (!zone?.zone_id && !zone?.zone_name) return;
+    if (!hasCookie("token")) return;
+    setProjectsLoading(true);
+    try {
+      const query = zone.zone_id
+        ? `zone_id=${zone.zone_id}`
+        : `zone=${encodeURIComponent(zone.zone_name)}`;
+      const { data } = await axios.get(`${PROJECT_MASTER_API}?${query}`, authHeader());
+      const raw = Array.isArray(data?.data) ? data.data : [];
+      setProjectList(raw.map(normalizeProject).filter((project) => project.project_id && project.project_name));
+    } catch (error) {
+      setProjectList([]);
+      toast.error(error?.response?.data?.message || "Failed to load projects", { autoClose: 2500 });
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
+  const loadCpAssignments = async (userId) => {
+    if (!userId || !hasCookie("token")) return [];
+    try {
+      const { data } = await axios.get(`${CP_PROJECT_ASSIGN_API}?user_id=${userId}`, authHeader());
+      const assignments = Array.isArray(data?.data?.assignments) ? data.data.assignments : [];
+      applyAssignments(userId, assignments);
+      return assignments;
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const openAssignRm = (userCode) => {
+    const row = dataList?.find((item) => item?.user_code === userCode);
+    const userId = row?.user_id || "";
+    setAssignRmUserId(userId);
+    setSelectedZone(null);
+    setProjectList([]);
+    setSelectedProjectIds([]);
+    setSelectedRmIds([]);
+    setCurrentAssignments([]);
+    setShowAssignRm(true);
+    loadZones();
+    if (userId) loadCpAssignments(userId);
+  };
+
+  const closeAssignRm = () => {
+    setShowAssignRm(false);
+    setAssignRmUserId("");
+    setSelectedZone(null);
+    setProjectList([]);
+    setSelectedProjectIds([]);
+    setSelectedRmIds([]);
+    setCurrentAssignments([]);
+  };
+
+  const selectedProjects = projectList.filter((project) =>
+    selectedProjectIds.map(String).includes(String(project.project_id))
+  );
+
+  const rmOptions = [];
+  selectedProjects.forEach((project) => {
+    (project.rm_users || []).forEach((user) => {
+      if (!rmOptions.some((option) => String(option.user_id) === String(user.user_id))) {
+        rmOptions.push(user);
+      }
+    });
+  });
+
+  const assignRmHandler = async () => {
+    if (!assignRmUserId) {
+      toast.error("Channel Partner not found", { autoClose: 2500 });
+      return;
+    }
+    if (!selectedZone) {
+      toast.error("Zone is required", { autoClose: 2500 });
+      return;
+    }
+    if (!selectedProjects.length) {
+      toast.error("Select at least one project", { autoClose: 2500 });
+      return;
+    }
+    if (!selectedRmIds.length) {
+      toast.error("Select at least one RM", { autoClose: 2500 });
+      return;
+    }
+    if (!hasCookie("token")) return;
+
+    setAssignRmSaving(true);
+    let lastAssignments = null;
+    const failed = [];
+    try {
+      for (const project of selectedProjects) {
+        const rmIds = selectedRmIds.filter((id) =>
+          project.rm_users?.some((user) => String(user.user_id) === String(id))
+        );
+        if (!rmIds.length) {
+          failed.push(`${project.project_name} has none of the selected RMs`);
+          continue;
+        }
+        try {
+          const response = await axios.post(
+            CP_PROJECT_ASSIGN_API,
+            {
+              user_id: Number(assignRmUserId),
+              project_id: Number(project.project_id),
+              rm_ids: rmIds.map((id) => Number(id)),
+            },
+            authHeader()
+          );
+          lastAssignments = response?.data?.data?.assignments || lastAssignments;
+        } catch (error) {
+          failed.push(error?.response?.data?.message || project.project_name);
+        }
+      }
+      if (lastAssignments) applyAssignments(assignRmUserId, lastAssignments);
+      if (failed.length) {
+        toast.error(failed.join(". "), { autoClose: 3500 });
+      } else {
+        toast.success("Project and RM assigned to Channel Partner", { autoClose: 2500 });
+        setSelectedProjectIds([]);
+        setSelectedRmIds([]);
+      }
+    } finally {
+      setAssignRmSaving(false);
+    }
+  };
+
+  const removeAssignment = async (projectId) => {
+    if (!assignRmUserId || !projectId || !hasCookie("token")) return;
+    try {
+      const response = await axios.delete(
+        `${CP_PROJECT_ASSIGN_API}?user_id=${assignRmUserId}&project_id=${projectId}`,
+        authHeader()
+      );
+      const assignments = response?.data?.data?.assignments || [];
+      applyAssignments(assignRmUserId, assignments);
+      toast.success(response?.data?.message || "Project removed from Channel Partner", { autoClose: 2500 });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to remove project", { autoClose: 2500 });
+    }
+  };
+
+  useEffect(() => {
+    if (!(isBstProfile || isRmRole(userInfo?.role_id)) || !Array.isArray(dataList) || !dataList.length || !hasCookie("token")) return;
+    let cancelled = false;
+    const loadAll = async () => {
+      const entries = await Promise.all(
+        dataList.map(async (cp) => {
+          if (!cp?.user_id) return null;
+          try {
+            const { data } = await axios.get(
+              `${CP_PROJECT_ASSIGN_API}?user_id=${cp.user_id}`,
+              authHeader()
+            );
+            const assignments = Array.isArray(data?.data?.assignments) ? data.data.assignments : [];
+            return [cp.user_id, assignments];
+          } catch (error) {
+            return null;
+          }
+        })
+      );
+      if (cancelled) return;
+      setAssignmentMap((prev) => {
+        const next = { ...prev };
+        entries.filter(Boolean).forEach(([userId, assignments]) => {
+          next[userId] = formatAssignmentNames(assignments);
+        });
+        return next;
+      });
+      setAssignmentDetails((prev) => {
+        const next = { ...prev };
+        entries.filter(Boolean).forEach(([userId, assignments]) => {
+          next[userId] = assignments;
+        });
+        return next;
+      });
+    };
+    loadAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataList, isBstProfile, userInfo?.role_id]);
+
   const columns = [
 
 
@@ -176,6 +579,32 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     {
       name: "operating_location",
       label: "Operating Location",
+      options: {
+        filter: false,
+        customHeadRender: (columnMeta) => (
+          <th
+            className="text-center"
+            style={{
+              background: clientBtnColor ? clientBtnColor : "#293790",
+              color: "white",
+              paddingLeft: "15px"
+            }}
+          >
+            {columnMeta.label}
+          </th>
+        ),
+        customBodyRender: (value) => {
+          return (
+            <div className="status_box text-center" style={{ color: "#293790" }}>
+              {value || "-"}
+            </div>
+          );
+        }
+      }
+    },
+    {
+      name: "zone_name",
+      label: "Zone",
       options: {
         filter: false,
         customHeadRender: (columnMeta) => (
@@ -381,6 +810,51 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       }
     },
     {
+      name: 'assignedToRm',
+      label: "Assigned TO RM",
+      options: {
+        filter: true,
+        display: selectedOption === "Channel Partner",
+        customHeadRender: (columnMeta) => (
+          <th className="text-center" style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: 'white', paddingLeft: "15px" }}   >
+            {columnMeta.label}
+          </th>
+        ),
+        customBodyRender: (value, tableMeta) => {
+          const names = String(value || "")
+            .split(",")
+            .map((name) => name.trim())
+            .filter(Boolean);
+          if (!names.length) {
+            return (
+              <div className='status_box fw-bold text-center' style={{ color: "#293790" }}>
+                -
+              </div>
+            );
+          }
+          const userCode = tableMeta?.rowData?.[0];
+          const cp = dataList?.find((item) => item?.user_code === userCode);
+          return (
+            <div className='status_box fw-bold text-center' style={{ color: "#293790" }}>
+              {names.map((name, index) => (
+                <span key={`${name}-${index}`}>
+                  {index > 0 ? ", " : ""}
+                  <button
+                    type="button"
+                    onClick={() => openRmDetails(cp?.user_id, name)}
+                    className="fw-bold text-decoration-underline border-0 bg-transparent p-0"
+                    style={{ color: "#293790" }}
+                  >
+                    {name}
+                  </button>
+                </span>
+              ))}
+            </div>
+          );
+        }
+      }
+    },
+    {
       name: 'user_status',
       label: "Status",
       options: {
@@ -466,17 +940,34 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         filter: false,
         download: false,
         viewColumns: false,
-        display: (userInfo?.role_id == null || userInfo?.role_id == 3) && (selectedOption == "Channel Partner" || (selectedOption == "BST" && userInfo?.role_id == null)) ? true : false,
+        display: (
+          ((userInfo?.role_id == null || userInfo?.role_id == 3) && (selectedOption == "Channel Partner" || (selectedOption == "BST" && userInfo?.role_id == null)))
+          || (isBstProfile && selectedOption === "Channel Partner")
+        ) ? true : false,
         customHeadRender: (columnMeta, updateDirection) => (
           <th className="text-center" style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: 'white', paddingLeft: "15px" }}   >
             {columnMeta.label}
           </th>
         ),
         customBodyRender: (value, tableMeta, updateValue) => {
+          if (isBstProfile) {
+            return (
+              <div className="table_btns justify-content-center align-items-center">
+                <button
+                  onClick={() => openAssignRm(value)}
+                  style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
+                  className='pe-3 ps-3'
+                  title='Assign TO RM'>
+                  Assign TO RM
+                </button>
+              </div>
+            )
+          }
+          const row = dataList?.find((item) => item?.user_code === value);
           return (
             <div className="table_btns justify-content-center align-items-center">
               <button
-                onClick={() => { setShowAssignTo(value); setAssignPrefill(tableMeta?.tableData[tableMeta?.rowIndex][11] ?? "") }}
+                onClick={() => { setShowAssignTo(value); setAssignPrefill(row?.reportToUser?.user_id ?? row?.report_to ?? "") }}
                 style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
                 className='pe-3 ps-3'
                 title='Assign - To'>
@@ -827,9 +1318,11 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     ...list,
     cpt_id: list?.cpt_id, // Preserve the actual cpt_id value, don't overwrite with role_name
     reportToUser: [list?.reportToUser?.user]?.filter(d => d !== null && d !== undefined),
+    assignedToRm: assignmentMap[list?.user_id] || rmNamesFromUser(list) || "",
     user_status: list?.user_status ? "active" : "inactive",
     db_user_profile: [list?.db_user_profile?.db_designation?.designation]?.filter(d => d !== null && d !== undefined),
-    reportToUserId: list?.reportToUser?.user_id
+    reportToUserId: list?.reportToUser?.user_id,
+    zone_name: list?.zone_name || list?.zone?.zone_name || list?.db_zone?.zone_name || "",
   }))
 
   return (
@@ -985,6 +1478,203 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             Submit
           </button>
         </Modal.Footer>
+      </Modal>
+
+      <Modal className="commonModal" show={showAssignRm} onHide={closeAssignRm}>
+        <Modal.Header closeButton>
+          <Modal.Title>Assign TO RM</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="add_user_form">
+            <div className="row">
+              <div className="col-xl-12 col-md-12 col-sm-12 col-12">
+                <div className="input_box">
+                  <label className="form-label">Zone</label>
+                  <Select
+                    id="assign-rm-zone"
+                    isSearchable={true}
+                    isClearable={true}
+                    placeholder="Select Zone"
+                    noOptionsMessage={() => "No zones found"}
+                    options={zoneList.map((zone) => ({
+                      value: String(zone.zone_id),
+                      label: zone.zone_name,
+                      zone,
+                    }))}
+                    value={
+                      selectedZone
+                        ? { value: String(selectedZone.zone_id), label: selectedZone.zone_name }
+                        : null
+                    }
+                    onChange={(option) => {
+                      const zone = option?.zone || null;
+                      setSelectedZone(zone);
+                      loadProjectsByZone(zone);
+                    }}
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: "38px" }),
+                      menu: (base) => ({ ...base, zIndex: 9999 }),
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
+                <div className="input_box">
+                  <label className="form-label">Project</label>
+                  <Select
+                    id="assign-rm-project"
+                    isMulti
+                    closeMenuOnSelect={false}
+                    hideSelectedOptions={false}
+                    components={{ Option: CheckboxOption }}
+                    isSearchable={true}
+                    isClearable={true}
+                    isDisabled={!selectedZone || projectsLoading}
+                    isLoading={projectsLoading}
+                    placeholder={
+                      !selectedZone
+                        ? "Select Zone first"
+                        : projectsLoading
+                          ? "Loading projects..."
+                          : "Select Project"
+                    }
+                    noOptionsMessage={() => "No projects found for this zone"}
+                    options={projectList.map((project) => ({
+                      value: String(project.project_id),
+                      label: project.rm_users?.length
+                        ? project.project_name
+                        : `${project.project_name} (No RM)`,
+                      isDisabled: !project.rm_users?.length,
+                    }))}
+                    value={selectedProjects.map((project) => ({
+                      value: String(project.project_id),
+                      label: project.project_name,
+                    }))}
+                    onChange={(options) => {
+                      const ids = (options || []).map((option) => String(option.value));
+                      const allowedRmIds = projectList
+                        .filter((project) => ids.includes(String(project.project_id)))
+                        .flatMap((project) => (project.rm_users || []).map((user) => String(user.user_id)));
+                      setSelectedProjectIds(ids);
+                      setSelectedRmIds((prev) => prev.filter((id) => allowedRmIds.includes(String(id))));
+                    }}
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: "38px" }),
+                      menu: (base) => ({ ...base, zIndex: 9999 }),
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
+                <div className="input_box">
+                  <label className="form-label">RM</label>
+                  <Select
+                    id="assign-rm-users"
+                    isMulti
+                    closeMenuOnSelect={false}
+                    hideSelectedOptions={false}
+                    components={{ Option: CheckboxOption }}
+                    isSearchable={true}
+                    isDisabled={!rmOptions.length}
+                    placeholder={selectedProjects.length ? "Select RM" : "Select Project first"}
+                    noOptionsMessage={() => "No RM assigned to the selected projects"}
+                    options={rmOptions.map((user) => ({
+                      value: String(user.user_id),
+                      label: user.name || `RM ${user.user_id}`,
+                    }))}
+                    value={rmOptions
+                      .filter((user) => selectedRmIds.map(String).includes(String(user.user_id)))
+                      .map((user) => ({
+                        value: String(user.user_id),
+                        label: user.name || `RM ${user.user_id}`,
+                      }))}
+                    onChange={(options) => setSelectedRmIds((options || []).map((option) => option.value))}
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: "38px" }),
+                      menu: (base) => ({ ...base, zIndex: 9999 }),
+                    }}
+                  />
+                </div>
+              </div>
+              {currentAssignments.length ? (
+                <div className="col-12 mt-3">
+                  <label className="form-label">Assigned</label>
+                  {currentAssignments.map((item) => (
+                    <div
+                      key={item.project_id}
+                      className="d-flex justify-content-between align-items-center gap-2 mb-2"
+                    >
+                      <div style={{ color: "#293790" }}>
+                        <div className="fw-bold">{item.project || item.project_name}</div>
+                        <div>{item.rm_name || formatAssignmentNames([item]) || "-"}</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-danger rounded-5"
+                        onClick={() => removeAssignment(item.project_id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-danger rounded-5" onClick={closeAssignRm} disabled={assignRmSaving}>
+            Cancel
+          </button>
+          <button
+            style={{ background: clientBtnColor }}
+            className="btn rounded-5 text-white"
+            onClick={assignRmHandler}
+            disabled={assignRmSaving}
+          >
+            {assignRmSaving ? "Submitting..." : "Submit"}
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={rmDetailsShow} onHide={() => setRmDetailsShow(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>RM Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="table-responsive">
+            <table className="table align-middle mb-0">
+              <thead style={{ background: "#f5f7fb" }}>
+                <tr>
+                  <th>User ID</th>
+                  <th>Name</th>
+                  <th>Zone</th>
+                  <th>State</th>
+                  <th>city</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rmDetailsRows.length ? (
+                  rmDetailsRows.map((rm, idx) => (
+                    <tr key={`${rm.user_id}-${idx}`}>
+                      <td>{rm.user_id}</td>
+                      <td>{rm.name}</td>
+                      <td>{rm.zone || "-"}</td>
+                      <td>{rm.state || "-"}</td>
+                      <td>{rm.city || "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="text-center py-3">
+                      No RM details found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Modal.Body>
       </Modal>
 
     </>

@@ -35,3 +35,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# published zone list for the public registration form
+/data/public-zones.json
+/data/zone-master.json
