@@ -3,9 +3,11 @@ import MUIDataTable from "mui-datatables";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button, Modal } from 'react-bootstrap';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
 import axios from 'axios';
-import { Baseurl, isRmRole, isBstRole } from '../../../../Utils/Constants';
+import { Baseurl, isRmRole, isBstRole, showCpVisitScheduleColumns } from '../../../../Utils/Constants';
+import moment from 'moment';
+import { getZoneList } from '../../../../Utils/zoneMasterApi';
 import { getCookie, hasCookie, setCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
 import DateRange from '../../../DateRangeCustom/Daterange';
@@ -18,6 +20,36 @@ import EditIcon from "../../../Svg/EditIcon";
 import ViewIcon from "../../../Svg/ViewIcon";
 
 
+
+const CheckboxOption = (props) => {
+  const { isFocused, isSelected, children, innerProps, getStyles, isDisabled, ...rest } = props;
+  let bg = "transparent";
+  if (isFocused) bg = "#eee";
+  if (isSelected) bg = "#B2D4FF";
+
+  return (
+    <components.Option
+      {...rest}
+      isDisabled={isDisabled}
+      isFocused={isFocused}
+      isSelected={isSelected}
+      getStyles={getStyles}
+      innerProps={{
+        ...innerProps,
+        style: {
+          alignItems: "center",
+          backgroundColor: bg,
+          color: "inherit",
+          display: "flex",
+          gap: 8,
+        },
+      }}
+    >
+      <input type="checkbox" checked={isSelected} readOnly style={{ marginRight: 8 }} />
+      {children}
+    </components.Option>
+  );
+};
 
 const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo, setoldAssignTo, oldAssignToRm, setoldAssignToRm, setShowDateFilter, usersList, getDataList, loader, selectedOption, setSelectedOption, channelPartnerFilter }) => {
   const router = useRouter()
@@ -43,6 +75,54 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const clientBtnColor = hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#293790"
   const [partnerTypes, setPartnerTypes] = useState([])
   const [errorToast, setErrorToast] = useState(false);
+  const [showAssignRm, setShowAssignRm] = useState(false);
+  const [assignRmUserId, setAssignRmUserId] = useState("");
+  const [zoneList, setZoneList] = useState([]);
+  const [projectList, setProjectList] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedProjectIds, setSelectedProjectIds] = useState([]);
+  const [assignRmSaving, setAssignRmSaving] = useState(false);
+  const [assignmentMap, setAssignmentMap] = useState({});
+  const [assignmentDetails, setAssignmentDetails] = useState({});
+  const [currentAssignments, setCurrentAssignments] = useState([]);
+  const [rmDetailsShow, setRmDetailsShow] = useState(false);
+  const [rmDetailsRows, setRmDetailsRows] = useState([]);
+  const [showVisitModal, setShowVisitModal] = useState(false);
+  const [visitSaving, setVisitSaving] = useState(false);
+  const [visitErrors, setVisitErrors] = useState({});
+  const [visitProjectList, setVisitProjectList] = useState([]);
+  const [visitForm, setVisitForm] = useState({
+    cpl_id: "",
+    user_id: "",
+    first_name: "",
+    last_name: "",
+    contact: "",
+    email: "",
+    createdAt: "",
+    stage: "VISIT",
+    remarks: "",
+    follow_up_date: "",
+    schedule_visit_date: "",
+    schedule_visit_time: "",
+    project_id: "",
+    project_name: "",
+    visit_type: "",
+    state_id: "",
+    city_id: "",
+    operating_location: "",
+    zone_name: "",
+  });
+  const isBstProfile = isBstRole(userInfo?.role_id);
+  const isRmProfile = isRmRole(userInfo?.role_id);
+  const showScheduleTimeField = showCpVisitScheduleColumns(userInfo);
+  const visitTypeOptions = [
+    { value: "Video Visit", label: "Video Visit" },
+    { value: "Site Visit", label: "Site Visit" },
+    { value: "Out Visit", label: "Out Visit" },
+  ];
+  const CP_PROJECT_ASSIGN_API = `${Baseurl}/db/channel/cp-project-assign`;
+  const PROJECT_MASTER_API = `${Baseurl}/db/channel/project-master`;
 
 
   async function getPartnerTypes() {
@@ -74,11 +154,6 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const getBstUserOptions = () => [
     { value: userInfo?.user_id, label: "N.A" },
     ...(usersList?.filter(user => isBstRole(user.role_id))?.map(mapUserOption) || []),
-  ];
-
-  const getRmUserOptions = () => [
-    { value: userInfo?.user_id, label: "N.A" },
-    ...(usersList?.filter(user => isRmRole(user.role_id))?.map(mapUserOption) || []),
   ];
 
   const userListFilterBasisOfRole = (selectedOption, usersList) => {
@@ -129,6 +204,488 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     return null;
   };
 
+  const authHeader = () => {
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    return {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        db: db_name,
+        pass: "pass",
+      },
+    };
+  };
+
+  const formatAssignmentNames = (assignments = []) => {
+    const names = assignments.flatMap((item) => {
+      if (Array.isArray(item?.rm_names) && item.rm_names.length) return item.rm_names;
+      if (item?.rm_name) return String(item.rm_name).split(",").map((name) => name.trim());
+      if (Array.isArray(item?.rm_users)) return item.rm_users.map((user) => user?.name || user?.user);
+      return [];
+    }).map((name) => String(name || "").trim()).filter(Boolean);
+    return [...new Set(names)].join(", ");
+  };
+
+  const rmNamesFromUser = (list) => {
+    if (Array.isArray(list?.assigned_rm) && list.assigned_rm.length) {
+      const fromAssignments = formatAssignmentNames(list.assigned_rm);
+      if (fromAssignments) return fromAssignments;
+    }
+    if (Array.isArray(list?.assigned_rm_users) && list.assigned_rm_users.length) {
+      return [...new Set(
+        list.assigned_rm_users
+          .map((user) => String(user?.name || user?.user || "").trim())
+          .filter(Boolean)
+      )].join(", ");
+    }
+    return "";
+  };
+
+  const applyAssignments = (userId, assignments = []) => {
+    setCurrentAssignments(assignments);
+    setAssignmentMap((prev) => ({
+      ...prev,
+      [userId]: formatAssignmentNames(assignments),
+    }));
+    setAssignmentDetails((prev) => ({
+      ...prev,
+      [userId]: assignments,
+    }));
+  };
+
+  const buildRmRows = (assignments = [], onlyName = "") => {
+    const rows = assignments.flatMap((item) => {
+      const users = Array.isArray(item?.rm_users) && item.rm_users.length
+        ? item.rm_users
+        : (Array.isArray(item?.rm_names) ? item.rm_names : String(item?.rm_name || "").split(","))
+            .map((name, index) => ({
+              user_id: item?.rm_ids?.[index],
+              name: String(name || "").trim(),
+            }))
+            .filter((user) => user.name);
+      return users.map((user) => ({
+        user_id: user?.user_id || user?.id || "-",
+        name: user?.name || user?.user || "-",
+        zone: user?.zone || user?.zone_name || item?.zone || "-",
+        state:
+          user?.state_name ||
+          (typeof user?.state === "string" ? user.state : "") ||
+          item?.projectState?.state_name ||
+          item?.state_name ||
+          "-",
+        city:
+          user?.city_name ||
+          (typeof user?.city === "string" ? user.city : "") ||
+          item?.projectCity?.city_name ||
+          item?.city_name ||
+          "-",
+        project_id: item?.project_id,
+        zone_name: item?.zone || "",
+      }));
+    });
+    if (!onlyName) return rows;
+    return rows.filter((row) => String(row.name).trim().toLowerCase() === String(onlyName).trim().toLowerCase());
+  };
+
+  const enrichRmRows = async (rows, assignments) => {
+    const zones = [...new Set(assignments.map((item) => item?.zone).filter(Boolean))];
+    if (!zones.length || !hasCookie("token")) return rows;
+    const projects = [];
+    await Promise.all(
+      zones.map(async (zone) => {
+        try {
+          const { data } = await axios.get(
+            `${PROJECT_MASTER_API}?zone=${encodeURIComponent(zone)}`,
+            authHeader()
+          );
+          const raw = Array.isArray(data?.data) ? data.data : [];
+          projects.push(...raw);
+        } catch (error) {
+          // keep the assignment fields already available
+        }
+      })
+    );
+    return rows.map((row) => {
+      const project = projects.find((item) => String(item?.project_id) === String(row.project_id));
+      const user = (project?.rm_users || []).find((item) => String(item?.user_id) === String(row.user_id));
+      return {
+        ...row,
+        zone: row.zone && row.zone !== "-" ? row.zone : project?.zone || row.zone,
+        state: row.state && row.state !== "-" ? row.state : user?.state || project?.projectState?.state_name || row.state,
+        city: row.city && row.city !== "-" ? row.city : user?.city || project?.projectCity?.city_name || row.city,
+      };
+    });
+  };
+
+  const loadVisitProjects = async () => {
+    if (visitProjectList.length || !hasCookie("token")) return;
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    try {
+      const projects = await axios.get(`${Baseurl}/db/channel/lead/projects`, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          db: db_name,
+          m_id: 76,
+        },
+      });
+      const raw = projects?.data?.data;
+      const records = Array.isArray(raw?.records)
+        ? raw.records
+        : Array.isArray(raw)
+          ? raw
+          : [];
+      setVisitProjectList(records);
+    } catch (error) {
+      setVisitProjectList([]);
+    }
+  };
+
+  const openScheduleVisit = (userCode) => {
+    const row = dataList?.find((item) => item?.user_code === userCode);
+    if (!row) return;
+    setVisitForm({
+      cpl_id: row?.cpl_id || "",
+      user_id: row?.user_id || "",
+      first_name: row?.user || "",
+      last_name: row?.user_l_name || "",
+      contact: row?.contact_number ? String(row.contact_number) : "",
+      email: row?.email || "",
+      createdAt: row?.createdAt || "",
+      stage: "VISIT",
+      remarks: row?.remarks || "",
+      follow_up_date: "",
+      schedule_visit_date: "",
+      schedule_visit_time: "",
+      project_id: "",
+      project_name: "",
+      visit_type: "",
+      state_id: row?.state_id || "",
+      city_id: row?.city_id || "",
+      operating_location: row?.operating_location || "",
+      zone_name: row?.zone_name || "",
+    });
+    setVisitErrors({});
+    setShowVisitModal(true);
+    loadVisitProjects();
+  };
+
+  const handleVisitInput = (event) => {
+    const { name, value } = event.target;
+    if (name === "stage" && value !== "VISIT") {
+      setVisitForm((prev) => ({
+        ...prev,
+        stage: value,
+        schedule_visit_date: "",
+        schedule_visit_time: "",
+        project_id: "",
+        project_name: "",
+        visit_type: "",
+      }));
+      return;
+    }
+    setVisitForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validateVisitForm = () => {
+    const nextErrors = {};
+    if (!visitForm.first_name) nextErrors.first_name = "First name is required";
+    if (!visitForm.last_name) nextErrors.last_name = "Last name is required";
+    if (!visitForm.contact || String(visitForm.contact).length !== 10) {
+      nextErrors.contact = "Contact must be 10 digits";
+    }
+    if (!visitForm.email || !/\S+@\S+\.\S+/.test(visitForm.email)) {
+      nextErrors.email = "Valid email is required";
+    }
+    if (visitForm.stage === "FOLLOW UP" && !visitForm.follow_up_date) {
+      nextErrors.follow_up_date = "Date is required";
+    }
+    if (visitForm.stage === "VISIT") {
+      if (!String(visitForm.schedule_visit_date || "").slice(0, 10)) {
+        nextErrors.follow_up_date = "Scheduled date is required";
+      }
+      if (showScheduleTimeField && !visitForm.schedule_visit_time) {
+        nextErrors.schedule_visit_time = "Scheduled time is required";
+      }
+      if (!visitForm.project_id) nextErrors.project_id = "Project is required";
+      if (!visitForm.visit_type) nextErrors.visit_type = "Visit Type is required";
+    }
+    return nextErrors;
+  };
+
+  const submitScheduleVisit = async (event) => {
+    event?.preventDefault?.();
+    const nextErrors = validateVisitForm();
+    if (Object.keys(nextErrors).length) {
+      setVisitErrors(nextErrors);
+      toast.error(Object.values(nextErrors)[0], { autoClose: 2500 });
+      return;
+    }
+    if (!hasCookie("token")) {
+      toast.error("Please login again", { autoClose: 2500 });
+      return;
+    }
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    const header = {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        db: db_name,
+        pass: "pass",
+      },
+    };
+    if (!visitForm.cpl_id) {
+      toast.error("Lead record not found", { autoClose: 2500 });
+      return;
+    }
+    const timeValue = String(visitForm.schedule_visit_time || "");
+    const payload = {
+      cpl_id: visitForm.cpl_id,
+      stage: "VISIT",
+      project_id: visitForm.project_id,
+      visit_type: visitForm.visit_type,
+      schedule_visit_date: String(visitForm.schedule_visit_date || "").slice(0, 10),
+      schedule_visit_time: timeValue.length === 5 ? `${timeValue}:00` : timeValue,
+      remarks: visitForm.remarks || "",
+    };
+
+    setVisitSaving(true);
+    try {
+      const response = await axios.put(`${Baseurl}/db/channelPartnerLeads`, payload, header);
+      toast.success(response?.data?.message || "Visit scheduled", { autoClose: 2500 });
+      setShowVisitModal(false);
+      if (getDataList) getDataList();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Something went wrong!", { autoClose: 2500 });
+    } finally {
+      setVisitSaving(false);
+    }
+  };
+
+  const openRmDetails = async (cpUserId, rmName) => {
+    const fromList = dataList?.find((item) => String(item?.user_id) === String(cpUserId));
+    const stored = assignmentDetails[cpUserId];
+    const assignments = Array.isArray(stored) && stored.length
+      ? stored
+      : (Array.isArray(fromList?.assigned_rm) ? fromList.assigned_rm : []);
+    let rows = buildRmRows(assignments, rmName);
+    if (rows.some((row) => !row.state || row.state === "-" || !row.city || row.city === "-")) {
+      rows = await enrichRmRows(rows, assignments);
+    }
+    setRmDetailsRows(rows);
+    setRmDetailsShow(true);
+  };
+
+  const normalizeProject = (item = {}) => {
+    const rmUsers = (Array.isArray(item?.rm_users) ? item.rm_users : [])
+      .map((user) => ({
+        user_id: user?.user_id || user?.id,
+        name: user?.name || user?.user || "",
+      }))
+      .filter((user) => user.user_id);
+    const rmIds = rmUsers.length
+      ? rmUsers.map((user) => String(user.user_id))
+      : Array.isArray(item?.rm_ids)
+        ? item.rm_ids.map(String)
+        : [];
+    const rmNames = Array.isArray(item?.rm_names)
+      ? item.rm_names
+      : item?.rm_name
+        ? String(item.rm_name).split(",").map((name) => name.trim()).filter(Boolean)
+        : rmUsers.map((user) => user.name).filter(Boolean);
+    const users = rmUsers.length
+      ? rmUsers
+      : rmIds.map((id, index) => ({ user_id: id, name: rmNames[index] || `RM ${id}` }));
+    return {
+      project_id: item?.project_id || item?.id || "",
+      project_name: item?.project || item?.project_name || item?.name || "",
+      zone: item?.zone || item?.zone_name || "",
+      rm_users: users,
+      rm_ids: users.map((user) => String(user.user_id)),
+      rm_name: (item?.rm_name || rmNames.join(", ")).trim(),
+    };
+  };
+
+  const loadZones = async () => {
+    if (!hasCookie("token")) return;
+    try {
+      const zones = await getZoneList(authHeader());
+      setZoneList(zones.filter((zone) => zone.status !== false && zone.zone_name));
+    } catch (error) {
+      setZoneList([]);
+      toast.error(error?.response?.data?.message || "Failed to load zones", { autoClose: 2500 });
+    }
+  };
+
+  const loadProjectsByZone = async (zone) => {
+    setProjectList([]);
+    setSelectedProjectIds([]);
+    if (!zone?.zone_id && !zone?.zone_name) return;
+    if (!hasCookie("token")) return;
+    setProjectsLoading(true);
+    try {
+      const query = zone.zone_id
+        ? `zone_id=${zone.zone_id}`
+        : `zone=${encodeURIComponent(zone.zone_name)}`;
+      const { data } = await axios.get(`${PROJECT_MASTER_API}?${query}`, authHeader());
+      const raw = Array.isArray(data?.data) ? data.data : [];
+      setProjectList(raw.map(normalizeProject).filter((project) => project.project_id && project.project_name));
+    } catch (error) {
+      setProjectList([]);
+      toast.error(error?.response?.data?.message || "Failed to load projects", { autoClose: 2500 });
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
+  const loadCpAssignments = async (userId) => {
+    if (!userId || !hasCookie("token")) return [];
+    try {
+      const { data } = await axios.get(`${CP_PROJECT_ASSIGN_API}?user_id=${userId}`, authHeader());
+      const assignments = Array.isArray(data?.data?.assignments) ? data.data.assignments : [];
+      applyAssignments(userId, assignments);
+      return assignments;
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const openAssignRm = (userCode) => {
+    const row = dataList?.find((item) => item?.user_code === userCode);
+    const userId = row?.user_id || "";
+    setAssignRmUserId(userId);
+    setSelectedZone(null);
+    setProjectList([]);
+    setSelectedProjectIds([]);
+    setCurrentAssignments([]);
+    setShowAssignRm(true);
+    loadZones();
+    if (userId) loadCpAssignments(userId);
+  };
+
+  const closeAssignRm = () => {
+    setShowAssignRm(false);
+    setAssignRmUserId("");
+    setSelectedZone(null);
+    setProjectList([]);
+    setSelectedProjectIds([]);
+    setCurrentAssignments([]);
+  };
+
+  const selectedProjects = projectList.filter((project) =>
+    selectedProjectIds.map(String).includes(String(project.project_id))
+  );
+
+  const assignRmHandler = async () => {
+    if (!assignRmUserId) {
+      toast.error("Channel Partner not found", { autoClose: 2500 });
+      return;
+    }
+    if (!selectedZone) {
+      toast.error("Zone is required", { autoClose: 2500 });
+      return;
+    }
+    if (!selectedProjects.length) {
+      toast.error("Select at least one project", { autoClose: 2500 });
+      return;
+    }
+    if (!hasCookie("token")) return;
+
+    setAssignRmSaving(true);
+    let lastAssignments = null;
+    const failed = [];
+    try {
+      const assignedNames = [];
+      for (const project of selectedProjects) {
+        try {
+          const response = await axios.post(
+            `${Baseurl}/db/channel/cp-project-assign/round-robin`,
+            {
+              user_id: Number(assignRmUserId),
+              zone_id: Number(selectedZone.zone_id),
+              project_id: Number(project.project_id),
+            },
+            authHeader()
+          );
+          lastAssignments = response?.data?.data?.assignments || lastAssignments;
+          const rmName = response?.data?.data?.assigned_rm?.name;
+          if (rmName) assignedNames.push(rmName);
+        } catch (error) {
+          failed.push(error?.response?.data?.message || project.project_name);
+        }
+      }
+      if (lastAssignments) applyAssignments(assignRmUserId, lastAssignments);
+      if (failed.length) {
+        toast.error(failed.join(". "), { autoClose: 3500 });
+      } else {
+        const name = assignedNames[assignedNames.length - 1];
+        toast.success(name ? `Assigned to ${name}.` : "Project assigned to Channel Partner", { autoClose: 2500 });
+        setSelectedProjectIds([]);
+      }
+    } finally {
+      setAssignRmSaving(false);
+    }
+  };
+
+  const removeAssignment = async (projectId) => {
+    if (!assignRmUserId || !projectId || !hasCookie("token")) return;
+    try {
+      const response = await axios.delete(
+        `${CP_PROJECT_ASSIGN_API}?user_id=${assignRmUserId}&project_id=${projectId}`,
+        authHeader()
+      );
+      const assignments = response?.data?.data?.assignments || [];
+      applyAssignments(assignRmUserId, assignments);
+      toast.success(response?.data?.message || "Project removed from Channel Partner", { autoClose: 2500 });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to remove project", { autoClose: 2500 });
+    }
+  };
+
+  useEffect(() => {
+    if (!(isBstProfile || isRmRole(userInfo?.role_id)) || !Array.isArray(dataList) || !dataList.length || !hasCookie("token")) return;
+    let cancelled = false;
+    const loadAll = async () => {
+      const entries = await Promise.all(
+        dataList.map(async (cp) => {
+          if (!cp?.user_id) return null;
+          try {
+            const { data } = await axios.get(
+              `${CP_PROJECT_ASSIGN_API}?user_id=${cp.user_id}`,
+              authHeader()
+            );
+            const assignments = Array.isArray(data?.data?.assignments) ? data.data.assignments : [];
+            return [cp.user_id, assignments];
+          } catch (error) {
+            return null;
+          }
+        })
+      );
+      if (cancelled) return;
+      setAssignmentMap((prev) => {
+        const next = { ...prev };
+        entries.filter(Boolean).forEach(([userId, assignments]) => {
+          next[userId] = formatAssignmentNames(assignments);
+        });
+        return next;
+      });
+      setAssignmentDetails((prev) => {
+        const next = { ...prev };
+        entries.filter(Boolean).forEach(([userId, assignments]) => {
+          next[userId] = assignments;
+        });
+        return next;
+      });
+    };
+    loadAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataList, isBstProfile, userInfo?.role_id]);
+
   const columns = [
 
 
@@ -176,6 +733,32 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     {
       name: "operating_location",
       label: "Operating Location",
+      options: {
+        filter: false,
+        customHeadRender: (columnMeta) => (
+          <th
+            className="text-center"
+            style={{
+              background: clientBtnColor ? clientBtnColor : "#293790",
+              color: "white",
+              paddingLeft: "15px"
+            }}
+          >
+            {columnMeta.label}
+          </th>
+        ),
+        customBodyRender: (value) => {
+          return (
+            <div className="status_box text-center" style={{ color: "#293790" }}>
+              {value || "-"}
+            </div>
+          );
+        }
+      }
+    },
+    {
+      name: "zone_name",
+      label: "Zone",
       options: {
         filter: false,
         customHeadRender: (columnMeta) => (
@@ -381,6 +964,51 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       }
     },
     {
+      name: 'assignedToRm',
+      label: "Assigned TO RM",
+      options: {
+        filter: true,
+        display: selectedOption === "Channel Partner",
+        customHeadRender: (columnMeta) => (
+          <th className="text-center" style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: 'white', paddingLeft: "15px" }}   >
+            {columnMeta.label}
+          </th>
+        ),
+        customBodyRender: (value, tableMeta) => {
+          const names = String(value || "")
+            .split(",")
+            .map((name) => name.trim())
+            .filter(Boolean);
+          if (!names.length) {
+            return (
+              <div className='status_box fw-bold text-center' style={{ color: "#293790" }}>
+                -
+              </div>
+            );
+          }
+          const userCode = tableMeta?.rowData?.[0];
+          const cp = dataList?.find((item) => item?.user_code === userCode);
+          return (
+            <div className='status_box fw-bold text-center' style={{ color: "#293790" }}>
+              {names.map((name, index) => (
+                <span key={`${name}-${index}`}>
+                  {index > 0 ? ", " : ""}
+                  <button
+                    type="button"
+                    onClick={() => openRmDetails(cp?.user_id, name)}
+                    className="fw-bold text-decoration-underline border-0 bg-transparent p-0"
+                    style={{ color: "#293790" }}
+                  >
+                    {name}
+                  </button>
+                </span>
+              ))}
+            </div>
+          );
+        }
+      }
+    },
+    {
       name: 'user_status',
       label: "Status",
       options: {
@@ -466,17 +1094,51 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         filter: false,
         download: false,
         viewColumns: false,
-        display: (userInfo?.role_id == null || userInfo?.role_id == 3) && (selectedOption == "Channel Partner" || (selectedOption == "BST" && userInfo?.role_id == null)) ? true : false,
+        display: (
+          ((userInfo?.role_id == null || userInfo?.role_id == 3) && (selectedOption == "Channel Partner" || (selectedOption == "BST" && userInfo?.role_id == null)))
+          || (isBstProfile && selectedOption === "Channel Partner")
+          || (isRmProfile && selectedOption === "Channel Partner")
+        ) ? true : false,
         customHeadRender: (columnMeta, updateDirection) => (
           <th className="text-center" style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: 'white', paddingLeft: "15px" }}   >
             {columnMeta.label}
           </th>
         ),
         customBodyRender: (value, tableMeta, updateValue) => {
+          if (isRmProfile) {
+            const row = dataList?.find((item) => item?.user_code === value);
+            const canSchedule = row?.cpl_id != null && row?.cpl_id !== "";
+            return (
+              <div className="table_btns justify-content-center align-items-center">
+                <button
+                  className="action_btn"
+                  title={canSchedule ? "Schedule Visit" : "Lead record not found"}
+                  disabled={!canSchedule}
+                  onClick={() => canSchedule && openScheduleVisit(value)}
+                >
+                  <EditIcon />
+                </button>
+              </div>
+            );
+          }
+          if (isBstProfile) {
+            return (
+              <div className="table_btns justify-content-center align-items-center">
+                <button
+                  onClick={() => openAssignRm(value)}
+                  style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
+                  className='pe-3 ps-3'
+                  title='Assign TO RM'>
+                  Assign TO RM
+                </button>
+              </div>
+            )
+          }
+          const row = dataList?.find((item) => item?.user_code === value);
           return (
             <div className="table_btns justify-content-center align-items-center">
               <button
-                onClick={() => { setShowAssignTo(value); setAssignPrefill(tableMeta?.tableData[tableMeta?.rowIndex][11] ?? "") }}
+                onClick={() => { setShowAssignTo(value); setAssignPrefill(row?.reportToUser?.user_id ?? row?.report_to ?? "") }}
                 style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
                 className='pe-3 ps-3'
                 title='Assign - To'>
@@ -827,9 +1489,11 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     ...list,
     cpt_id: list?.cpt_id, // Preserve the actual cpt_id value, don't overwrite with role_name
     reportToUser: [list?.reportToUser?.user]?.filter(d => d !== null && d !== undefined),
+    assignedToRm: assignmentMap[list?.user_id] || rmNamesFromUser(list) || "",
     user_status: list?.user_status ? "active" : "inactive",
     db_user_profile: [list?.db_user_profile?.db_designation?.designation]?.filter(d => d !== null && d !== undefined),
-    reportToUserId: list?.reportToUser?.user_id
+    reportToUserId: list?.reportToUser?.user_id,
+    zone_name: list?.zone_name || list?.zone?.zone_name || list?.db_zone?.zone_name || "",
   }))
 
   return (
@@ -915,35 +1579,6 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                       />
                     </div>
                   </div>
-                  <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
-                    <div className="input_box">
-                      <label className="form-label">Assign To (RM)</label>
-                      <Select
-                        id="select-rm"
-                        isSearchable={true}
-                        isClearable={true}
-                        placeholder="Search and select RM user..."
-                        noOptionsMessage={() => "No RM users found"}
-                        filterOption={userSearchFilterOption}
-                        options={getRmUserOptions()}
-                        value={getSelectValue(oldAssignToRm)}
-                        onChange={(e) => {
-                          setoldAssignToRm?.(e?.value || "")
-                          if (e?.value) setoldAssignTo?.("")
-                        }}
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            minHeight: '38px',
-                          }),
-                          menu: (base) => ({
-                            ...base,
-                            zIndex: 9999,
-                          }),
-                        }}
-                      />
-                    </div>
-                  </div>
                 </>
               ) : (
                 <div className="col-xl-12 col-md-12 col-sm-12 col-12">
@@ -985,6 +1620,341 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             Submit
           </button>
         </Modal.Footer>
+      </Modal>
+
+      <Modal className="commonModal" show={showAssignRm} onHide={closeAssignRm}>
+        <Modal.Header closeButton>
+          <Modal.Title>Assign TO RM</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="add_user_form">
+            <div className="row">
+              <div className="col-xl-12 col-md-12 col-sm-12 col-12">
+                <div className="input_box">
+                  <label className="form-label">Zone</label>
+                  <Select
+                    id="assign-rm-zone"
+                    isSearchable={true}
+                    isClearable={true}
+                    placeholder="Select Zone"
+                    noOptionsMessage={() => "No zones found"}
+                    options={zoneList.map((zone) => ({
+                      value: String(zone.zone_id),
+                      label: zone.zone_name,
+                      zone,
+                    }))}
+                    value={
+                      selectedZone
+                        ? { value: String(selectedZone.zone_id), label: selectedZone.zone_name }
+                        : null
+                    }
+                    onChange={(option) => {
+                      const zone = option?.zone || null;
+                      setSelectedZone(zone);
+                      loadProjectsByZone(zone);
+                    }}
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: "38px" }),
+                      menu: (base) => ({ ...base, zIndex: 9999 }),
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
+                <div className="input_box">
+                  <label className="form-label">Project</label>
+                  <Select
+                    id="assign-rm-project"
+                    isMulti
+                    closeMenuOnSelect={false}
+                    hideSelectedOptions={false}
+                    components={{ Option: CheckboxOption }}
+                    isSearchable={true}
+                    isClearable={true}
+                    isDisabled={!selectedZone || projectsLoading}
+                    isLoading={projectsLoading}
+                    placeholder={
+                      !selectedZone
+                        ? "Select Zone first"
+                        : projectsLoading
+                          ? "Loading projects..."
+                          : "Select Project"
+                    }
+                    noOptionsMessage={() => "No projects found for this zone"}
+                    options={projectList.map((project) => ({
+                      value: String(project.project_id),
+                      label: project.rm_users?.length
+                        ? project.project_name
+                        : `${project.project_name} (No RM)`,
+                      isDisabled: !project.rm_users?.length,
+                    }))}
+                    value={selectedProjects.map((project) => ({
+                      value: String(project.project_id),
+                      label: project.project_name,
+                    }))}
+                    onChange={(options) => {
+                      const ids = (options || []).map((option) => String(option.value));
+                      setSelectedProjectIds(ids);
+                    }}
+                    styles={{
+                      control: (base) => ({ ...base, minHeight: "38px" }),
+                      menu: (base) => ({ ...base, zIndex: 9999 }),
+                    }}
+                  />
+                </div>
+              </div>
+              {currentAssignments.length ? (
+                <div className="col-12 mt-3">
+                  <label className="form-label">Assigned</label>
+                  {currentAssignments.map((item) => (
+                    <div
+                      key={item.project_id}
+                      className="d-flex justify-content-between align-items-center gap-2 mb-2"
+                    >
+                      <div style={{ color: "#293790" }}>
+                        <div className="fw-bold">{item.project || item.project_name}</div>
+                        <div>{item.rm_name || formatAssignmentNames([item]) || "-"}</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-danger rounded-5"
+                        onClick={() => removeAssignment(item.project_id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <button className="btn btn-danger rounded-5" onClick={closeAssignRm} disabled={assignRmSaving}>
+            Cancel
+          </button>
+          <button
+            style={{ background: clientBtnColor }}
+            className="btn rounded-5 text-white"
+            onClick={assignRmHandler}
+            disabled={assignRmSaving}
+          >
+            {assignRmSaving ? "Submitting..." : "Submit"}
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showVisitModal} onHide={() => setShowVisitModal(false)} className="commonModal">
+        <Modal.Header closeButton>
+          <Modal.Title>Update info</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={submitScheduleVisit}>
+            <Form.Group className="mb-2">
+              <Form.Label>First Name</Form.Label>
+              <Form.Control
+                name="first_name"
+                value={visitForm.first_name}
+                onChange={handleVisitInput}
+              />
+              {visitErrors.first_name && <Form.Text className="text-danger">{visitErrors.first_name}</Form.Text>}
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Last Name</Form.Label>
+              <Form.Control
+                name="last_name"
+                value={visitForm.last_name}
+                onChange={handleVisitInput}
+              />
+              {visitErrors.last_name && <Form.Text className="text-danger">{visitErrors.last_name}</Form.Text>}
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Contact</Form.Label>
+              <Form.Control
+                name="contact"
+                value={visitForm.contact}
+                maxLength={10}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 10);
+                  setVisitForm((prev) => ({ ...prev, contact: value }));
+                }}
+              />
+              {visitErrors.contact && <Form.Text className="text-danger">{visitErrors.contact}</Form.Text>}
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Email</Form.Label>
+              <Form.Control
+                type="email"
+                name="email"
+                value={visitForm.email}
+                onChange={handleVisitInput}
+              />
+              {visitErrors.email && <Form.Text className="text-danger">{visitErrors.email}</Form.Text>}
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Registration Date</Form.Label>
+              <Form.Control
+                readOnly
+                value={visitForm.createdAt ? moment(visitForm.createdAt).format("DD-MM-YYYY") : ""}
+              />
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Stage</Form.Label>
+              <Form.Control as="select" name="stage" value="VISIT" disabled>
+                <option value="VISIT">VISIT</option>
+              </Form.Control>
+            </Form.Group>
+            {(visitForm.stage === "FOLLOW UP" || visitForm.stage === "VISIT") && (
+              <Form.Group className="mb-2">
+                <Form.Label>{visitForm.stage === "VISIT" ? "Scheduled Date*" : "Date*"}</Form.Label>
+                <Form.Control
+                  type="date"
+                  name={visitForm.stage === "VISIT" ? "schedule_visit_date" : "follow_up_date"}
+                  value={
+                    visitForm.stage === "VISIT"
+                      ? String(visitForm.schedule_visit_date || "").slice(0, 10)
+                      : String(visitForm.follow_up_date || "").slice(0, 10)
+                  }
+                  min={moment().format("YYYY-MM-DD")}
+                  onChange={handleVisitInput}
+                />
+                {visitErrors.follow_up_date && (
+                  <Form.Text className="text-danger">{visitErrors.follow_up_date}</Form.Text>
+                )}
+              </Form.Group>
+            )}
+            {visitForm.stage === "VISIT" && showScheduleTimeField && (
+              <Form.Group className="mb-2">
+                <Form.Label>Scheduled Time*</Form.Label>
+                <Form.Control
+                  type="time"
+                  name="schedule_visit_time"
+                  value={visitForm.schedule_visit_time || ""}
+                  min={
+                    String(visitForm.schedule_visit_date || "").slice(0, 10) === moment().format("YYYY-MM-DD")
+                      ? moment().format("HH:mm")
+                      : undefined
+                  }
+                  onChange={handleVisitInput}
+                />
+                {visitErrors.schedule_visit_time && (
+                  <Form.Text className="text-danger">{visitErrors.schedule_visit_time}</Form.Text>
+                )}
+              </Form.Group>
+            )}
+            {visitForm.stage === "VISIT" && (
+              <>
+                <Form.Group className="mb-2">
+                  <Form.Label>Project*</Form.Label>
+                  <Form.Control
+                    as="select"
+                    name="project_id"
+                    value={visitForm.project_id || ""}
+                    onChange={(e) => {
+                      const selected = visitProjectList?.find((project) => {
+                        const id = project?.Id || project?.id || project?.project_id;
+                        return String(id) === String(e.target.value);
+                      });
+                      const projectName = selected?.Project_Name__c || selected?.project_name || selected?.project || selected?.name || "";
+                      setVisitForm((prev) => ({
+                        ...prev,
+                        project_id: e.target.value,
+                        project_name: projectName,
+                      }));
+                    }}
+                  >
+                    <option value="" disabled>Select Project</option>
+                    {visitProjectList?.map((project) => {
+                      const id = project?.Id || project?.id || project?.project_id;
+                      const name = project?.Project_Name__c || project?.project_name || project?.project || project?.name;
+                      return (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      );
+                    })}
+                  </Form.Control>
+                  {visitErrors.project_id && <Form.Text className="text-danger">{visitErrors.project_id}</Form.Text>}
+                </Form.Group>
+                <Form.Group className="mb-2">
+                  <Form.Label>Visit Type*</Form.Label>
+                  <Form.Control
+                    as="select"
+                    name="visit_type"
+                    value={visitForm.visit_type || ""}
+                    onChange={handleVisitInput}
+                  >
+                    <option value="" disabled>Select Visit Type</option>
+                    {visitTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Form.Control>
+                  {visitErrors.visit_type && <Form.Text className="text-danger">{visitErrors.visit_type}</Form.Text>}
+                </Form.Group>
+              </>
+            )}
+            <Form.Group className="mb-2">
+              <Form.Label>Remarks</Form.Label>
+              <Form.Control
+                name="remarks"
+                value={visitForm.remarks || ""}
+                onChange={handleVisitInput}
+                placeholder="Enter Remarks"
+              />
+            </Form.Group>
+            <Button
+              type="button"
+              className="float-end mt-3"
+              style={{ background: "#ff5722", borderColor: "#ff5722" }}
+              disabled={visitSaving}
+              onClick={submitScheduleVisit}
+            >
+              {visitSaving ? "Saving..." : visitForm.stage === "VISIT" ? "Schedule Visit" : "Update"}
+            </Button>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={rmDetailsShow} onHide={() => setRmDetailsShow(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>RM Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="table-responsive">
+            <table className="table align-middle mb-0">
+              <thead style={{ background: "#f5f7fb" }}>
+                <tr>
+                  <th>User ID</th>
+                  <th>Name</th>
+                  <th>Zone</th>
+                  <th>State</th>
+                  <th>city</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rmDetailsRows.length ? (
+                  rmDetailsRows.map((rm, idx) => (
+                    <tr key={`${rm.user_id}-${idx}`}>
+                      <td>{rm.user_id}</td>
+                      <td>{rm.name}</td>
+                      <td>{rm.zone || "-"}</td>
+                      <td>{rm.state || "-"}</td>
+                      <td>{rm.city || "-"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="text-center py-3">
+                      No RM details found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Modal.Body>
       </Modal>
 
     </>

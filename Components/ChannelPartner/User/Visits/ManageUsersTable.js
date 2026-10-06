@@ -665,6 +665,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
           Authorization: `Bearer ${token}`,
           db: db_name,
           pass: "pass",
+          m_id: 76,
         },
       };
 
@@ -802,8 +803,8 @@ const [value, setValue] = useState(getCurrentWeekDates());
         "Project Name",
         "Scheduled Date",
         "Scheduled Time",
-        "Activation Date",
-        "Activation Time",
+        "Orientation Date",
+        "Orientation Time",
         "Visit Type",
         "Assigned To",
         "Status",

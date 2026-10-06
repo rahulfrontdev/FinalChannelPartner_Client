@@ -88,22 +88,20 @@ export default function SignInScreen({ setLoggedIn }) {
     } else {
       try {
         let baseUrl = window.location.origin;
-        // Handle local development URLs (localhost and local IP addresses)
-        let payload = {};
-        if (baseUrl === "http://localhost:3000" || baseUrl === "http://192.168.1.36:3000" || baseUrl.startsWith("http://10.") || baseUrl.startsWith("http://192.168.") || baseUrl.startsWith("http://172.")) {
-          payload = {
-            email: userForm.email.toLowerCase(),
-            password: userForm.password,
-            type: type,
-          }
-        } else {
-          payload = {
-            email: userForm.email.toLowerCase(),
-            password: userForm.password,
-            type: type,
-            client_url: baseUrl
-          }
-        }
+        const isLocalDev =
+          /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(baseUrl) ||
+          baseUrl.startsWith("http://10.") ||
+          baseUrl.startsWith("http://192.168.") ||
+          baseUrl.startsWith("http://172.");
+        const clientUrl = isLocalDev
+          ? Baseurl.replace(/\/api\/v1\/?$/, "")
+          : baseUrl;
+        const payload = {
+          email: userForm.email.toLowerCase(),
+          password: userForm.password,
+          type: type,
+          client_url: clientUrl,
+        };
         const res = await axios.post(Baseurl + "/db/login", payload);
 
         if (res.status === 200) {

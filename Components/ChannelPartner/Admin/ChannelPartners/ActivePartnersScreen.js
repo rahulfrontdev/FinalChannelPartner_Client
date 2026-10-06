@@ -22,11 +22,6 @@ const DynamicTable = dynamic(
     () => import('./ManageUsersTable'),
     { ssr: false }
 )
-const DynamicLeadsTable = dynamic(
-    () => import('../CPRegisterLeads/CPRegisterLeadsTable'),
-    { ssr: false }
-)
-
 const ActivePartnersScreen = () => {
     const sideView = useSelector((state) => state.sideView.value);
     const router = useRouter()
@@ -155,28 +150,12 @@ const ActivePartnersScreen = () => {
             }
 
             try {
-                // RM profile: show CP leads instead of Channel Partner users list
-                if (isRm) {
-                    const response = await axios.get(
-                        Baseurl + `/db/channelPartnerLeads?db_name=${db_name}`,
-                        {
-                            headers: { ...header.headers, m_id: 76 },
-                            params: queryObjLeads,
-                        }
-                    );
-                    if (response?.status === 200 || response?.status === 201) {
-                        setLoader(false)
-                        setDataList(response?.data?.data?.leads || []);
-                    }
-                    return;
-                }
-
                 const roleIdByOption = {
                     "Channel Partner": 1,
                     "BST": 2,
                     "Director": 3,
                 };
-                const selectedRoleId = roleIdByOption[selectedOption] ?? 1;
+                const selectedRoleId = isRm ? 1 : (roleIdByOption[selectedOption] ?? 1);
 
                 // Date range filter (cookie / picker) — same as previous flow
                 const dateParams =
@@ -234,7 +213,47 @@ const ActivePartnersScreen = () => {
                     );
                 }
 
+                if (isRm) {
+                    try {
+                        const allRes = await axios.get(`${Baseurl}/db/users`, {
+                            ...header,
+                            params: dateParams,
+                        });
+                        const allUsers = Array.isArray(allRes?.data?.data) ? allRes.data.data : [];
+                        const partners = allUsers.filter((user) => Number(user?.role_id) === 1);
+                        if (partners.length) list = partners;
+                    } catch (_) {
+                        // Rolewise list stays when the full user list is not available.
+                    }
+                }
+
                 list = filterByCreatedDate(list);
+
+                if (isRm) {
+                    const rmId = userInfo?.user_id;
+                    const checks = await Promise.all(
+                        (list || []).map(async (cp) => {
+                            if (!cp?.user_id || !rmId) return null;
+                            try {
+                                const assignRes = await axios.get(
+                                    `${Baseurl}/db/channel/cp-project-assign?user_id=${cp.user_id}`,
+                                    header
+                                );
+                                const assignments = Array.isArray(assignRes?.data?.data?.assignments)
+                                    ? assignRes.data.data.assignments
+                                    : [];
+                                const assigned = assignments.some((item) =>
+                                    (item?.rm_ids || []).some((id) => String(id) === String(rmId)) ||
+                                    (item?.rm_users || []).some((rm) => String(rm?.user_id) === String(rmId))
+                                );
+                                return assigned ? cp : null;
+                            } catch (error) {
+                                return null;
+                            }
+                        })
+                    );
+                    list = checks.filter(Boolean);
+                }
 
                 setLoader(false);
                 setDataList(list);
@@ -456,11 +475,6 @@ const ActivePartnersScreen = () => {
         ...(usersList?.filter(user => isBstRole(user.role_id))?.map(mapUserOption) || []),
     ];
 
-    const getRmUserOptions = () => [
-        { value: userInfo?.user_id, label: "N.A" },
-        ...(usersList?.filter(user => isRmRole(user.role_id))?.map(mapUserOption) || []),
-    ];
-
     const userListFilterBasisOfRole = (selectedOption, usersList) => {
         if (selectedOption === "BST") {
             return [{ value: userInfo?.user_id, label: "N.A" }, ...usersList
@@ -579,46 +593,26 @@ const ActivePartnersScreen = () => {
                             </div>
 
                         </div>
-                        {isRm ? (
-                            <DynamicLeadsTable
-                                title='CP Leads'
-                                dataList={dataList}
-                                loader={loader}
-                                setdeleteshowConfirm={setdeleteshowConfirm}
-                                disableConfirm={disableConfirm}
-                                deleteConfirm={deleteConfirm}
-                                getDataList={getDataList}
-                                setcurrObj={setcurrObj}
-                                currObj={currObj}
-                                bstId={bstId}
-                                setBstId={setBstId}
-                                statusId={statusId}
-                                setStatusId={setStatusId}
-                                start={value?.startDate}
-                                end={value?.endDate}
-                            />
-                        ) : (
-                            <DynamicTable
-                                title={selectedOption}
-                                dataList={dataList}
-                                loader={loader}
-                                disableConfirm={disableConfirm}
-                                deleteConfirm={deleteConfirm}
-                                setShowAssignTo={setShowAssignTo}
-                                setoldAssignTo={setoldAssignTo}
-                                oldAssignTo={oldAssignTo}
-                                setoldAssignToRm={setoldAssignToRm}
-                                oldAssignToRm={oldAssignToRm}
-                                setShowDateFilter={setShowDateFilter}
-                                usersList={usersList}
-                                getDataList={getDataList}
-                                selectedOption={selectedOption}
-                                setSelectedOption={setSelectedOption}
-                                channelPartnerFilter={channelPartnerFilter}
-                                start={value?.startDate}
-                                end={value?.endDate}
-                            />
-                        )}
+                        <DynamicTable
+                            title={isRm ? "Channel Partner" : selectedOption}
+                            dataList={dataList}
+                            loader={loader}
+                            disableConfirm={disableConfirm}
+                            deleteConfirm={deleteConfirm}
+                            setShowAssignTo={setShowAssignTo}
+                            setoldAssignTo={setoldAssignTo}
+                            oldAssignTo={oldAssignTo}
+                            setoldAssignToRm={setoldAssignToRm}
+                            oldAssignToRm={oldAssignToRm}
+                            setShowDateFilter={setShowDateFilter}
+                            usersList={usersList}
+                            getDataList={getDataList}
+                            selectedOption={isRm ? "Channel Partner" : selectedOption}
+                            setSelectedOption={setSelectedOption}
+                            channelPartnerFilter={channelPartnerFilter}
+                            start={value?.startDate}
+                            end={value?.endDate}
+                        />
                     </div>
                 </div>
             </div>
@@ -680,35 +674,6 @@ const ActivePartnersScreen = () => {
                                                 onChange={(e) => {
                                                     setoldAssignTo(e?.value || "")
                                                     if (e?.value) setoldAssignToRm("")
-                                                }}
-                                                styles={{
-                                                    control: (base) => ({
-                                                        ...base,
-                                                        minHeight: '38px',
-                                                    }),
-                                                    menu: (base) => ({
-                                                        ...base,
-                                                        zIndex: 9999,
-                                                    }),
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
-                                        <div className="input_box">
-                                            <label className="form-label">Assign To (RM)</label>
-                                            <Select
-                                                id="select-rm"
-                                                isSearchable={true}
-                                                isClearable={true}
-                                                placeholder="Search and select RM user..."
-                                                noOptionsMessage={() => "No RM users found"}
-                                                filterOption={userSearchFilterOption}
-                                                value={getSelectValue(oldAssignToRm)}
-                                                options={getRmUserOptions()}
-                                                onChange={(e) => {
-                                                    setoldAssignToRm(e?.value || "")
-                                                    if (e?.value) setoldAssignTo("")
                                                 }}
                                                 styles={{
                                                     control: (base) => ({

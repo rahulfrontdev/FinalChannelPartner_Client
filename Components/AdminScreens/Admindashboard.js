@@ -320,6 +320,19 @@ const Admindashboard = () => {
                                                 <Hierarchy />
                                             </div>
                                         </div>
+                                        <div className="card_wrapper">
+                                            <div className="card_lists">
+                                                <div className="card_head">Zone Management</div>
+                                                <ul className="settings_list">
+                                                    <Link href="/ZoneManagement">
+                                                        <li className="list_item">Zone Management</li>
+                                                    </Link>
+                                                </ul>
+                                            </div>
+                                            <div className="icons">
+                                                <Hierarchy />
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="col-xl-6 col-md-6 col-sm-12 col-12">

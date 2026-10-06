@@ -294,6 +294,7 @@ const VisitDetailsScreen = () => {
       item?.status ||
       "";
     const statusKey = String(statusRaw).toLowerCase().trim();
+    const apiVisitStatus = String(item?.visit_status || "").trim().toLowerCase();
     const isOpenSchedule =
       statusKey === "visit" ||
       statusKey === "upcoming" ||
@@ -334,10 +335,13 @@ const VisitDetailsScreen = () => {
       (isOpenSchedule || hasVerifiedFlag || hasRealActivation);
 
     const isCompleted =
-      !looksRescheduled &&
-      (hasCompletedStatus ||
-        hasRealActivation ||
-        (hasVerifiedFlag && !isOpenSchedule));
+      apiVisitStatus === "completed" ||
+      (
+        !looksRescheduled &&
+        (hasCompletedStatus ||
+          hasRealActivation ||
+          (hasVerifiedFlag && !isOpenSchedule))
+      );
 
     const activationDate = isCompleted
       ? (item?.activation_date || mapped.activation_date || getCpVisitActivationDate(item) || "")
@@ -376,7 +380,9 @@ const VisitDetailsScreen = () => {
     );
     return {
       rowKey,
+      cpl_d_id: item?.cpl_d_id || null,
       visit_id:
+        item?.cpl_d_id ||
         item?.visit_id ||
         item?.history_id ||
         item?.vh_id ||
@@ -689,6 +695,7 @@ const VisitDetailsScreen = () => {
               Authorization: `Bearer ${token}`,
               db: db_name,
               pass: "pass",
+              m_id: 76,
             },
           }
         );
@@ -759,6 +766,7 @@ const VisitDetailsScreen = () => {
         Authorization: `Bearer ${token}`,
         db: db_name,
         pass: "pass",
+        m_id: 76,
       }
     };
 
@@ -933,6 +941,8 @@ const VisitDetailsScreen = () => {
       db_name: getCookie("db_name"),
       ...extra,
     };
+    const cplDetailId = selected?.cpl_d_id || selected?.raw?.cpl_d_id;
+    if (cplDetailId) payload.cpl_d_id = cplDetailId;
     if (selected?.visit_id) payload.visit_id = selected.visit_id;
     if (selected?.history_id) payload.history_id = selected.history_id;
     if (projectId) payload.project_id = projectId;
@@ -964,14 +974,23 @@ const VisitDetailsScreen = () => {
       toast.error("Please select a visit record", { autoClose: 2500 });
       return false;
     }
+    const cplDetailId = selectedFinishVisit?.cpl_d_id || selectedFinishVisit?.raw?.cpl_d_id;
+    if (!cplDetailId) {
+      toast.error("Visit not found for this lead", { autoClose: 2500 });
+      return false;
+    }
+    if (selectedFinishVisit?.isCompleted || String(selectedFinishVisit?.status || "").toLowerCase() === "completed") {
+      toast.error("Visit is already completed", { autoClose: 2500 });
+      return false;
+    }
 
     try {
-      const synced = await syncLeadToSelectedVisit();
-      if (!synced) return false;
-
       const { data } = await axios.post(
         `${Baseurl}/db/channelPartnerLeads/sendVisitCode`,
-        await buildVisitCodePayload(),
+        {
+          cpl_id: Number(cplId),
+          cpl_d_id: Number(cplDetailId),
+        },
         {
           headers: {
             Accept: "application/json",
@@ -998,7 +1017,7 @@ const VisitDetailsScreen = () => {
     }
   };
 
-  const verifyVisitCode = async (visitCode) => {
+  const verifyVisitCode = async (visitCode, remarks = "") => {
     if (!hasCookie('token')) return false;
     const token = getCookie('token');
     const db_name = getCookie('db_name');
@@ -1011,18 +1030,25 @@ const VisitDetailsScreen = () => {
       toast.error("Please select a visit record", { autoClose: 2500 });
       return false;
     }
+    const cplDetailId = selectedFinishVisit?.cpl_d_id || selectedFinishVisit?.raw?.cpl_d_id;
+    if (!cplDetailId) {
+      toast.error("Visit not found for this lead", { autoClose: 2500 });
+      return false;
+    }
     if (!visitCode) {
       toast.error("Please enter visit code", { autoClose: 2500 });
       return false;
     }
 
     try {
-      const synced = await syncLeadToSelectedVisit();
-      if (!synced) return false;
-
       const { data } = await axios.post(
         `${Baseurl}/db/channelPartnerLeads/verifyVisitCode`,
-        await buildVisitCodePayload({ visit_code: visitCode }),
+        {
+          cpl_id: Number(cplId),
+          cpl_d_id: Number(cplDetailId),
+          visit_code: visitCode,
+          ...(String(remarks || "").trim() ? { remarks: String(remarks).trim() } : {}),
+        },
         {
           headers: {
             Accept: "application/json",
@@ -1033,7 +1059,19 @@ const VisitDetailsScreen = () => {
         }
       );
       toast.success(data?.message || "Visit verified successfully", { autoClose: 2500 });
-      markSelectedVisitCompleted();
+      const result = data?.data || {};
+      if (result.activation_date || result.activation_time || result.visit_status) {
+        markSelectedVisitOverride({
+          isCompleted: true,
+          otpSent: false,
+          status: result.visit_status || "Completed",
+          activation_date: result.activation_date || "",
+          activation_time: result.activation_time || "",
+        });
+      } else {
+        markSelectedVisitCompleted();
+      }
+      getCpVisitById();
       return true;
     } catch (error) {
       if (error?.response?.data?.message) {
@@ -1079,8 +1117,8 @@ const VisitDetailsScreen = () => {
                         <th>Project Name</th>
                         <th>Scheduled Date</th>
                         <th>Scheduled Time</th>
-                        <th>Activation Date</th>
-                        <th>Activation Time</th>
+                        <th>Orientation Date</th>
+                        <th>Orientation Time</th>
                         <th>Visit Type</th>
                         <th>Assigned To</th>
                         <th>Status</th>

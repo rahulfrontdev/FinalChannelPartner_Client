@@ -48,8 +48,8 @@ const VisitHistoryModel = ({
                                 <>
                                     <th>Scheduled Date</th>
                                     <th>Scheduled Time</th>
-                                    <th>Activation Date</th>
-                                    <th>Activation Time</th>
+                                    <th>Orientation Date</th>
+                                    <th>Orientation Time</th>
                                     <th>Project Name</th>
                                 </>
                             ) : (

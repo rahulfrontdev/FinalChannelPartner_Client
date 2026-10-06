@@ -20,10 +20,13 @@ const NewRegistrationScreen = () => {
     state_id: "",
     city_id: "",
     operating_location: "",
+    zone_id: "",
+    zone_name: "",
   });
   const [clientData, setClientData] = useState();
   const [stateList, setStateList] = useState([]);
   const [cityList, setCityList] = useState([]);
+  const [zoneList, setZoneList] = useState([]);
   const { isButtonLoading } = useSelector((state) => state.buttonLoader)
   const dispatch = useDispatch()
 
@@ -32,7 +35,7 @@ const NewRegistrationScreen = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const { first_name, last_name, email, contact, state_id, city_id, operating_location } = formFields;
+    const { first_name, last_name, email, contact, state_id, city_id, operating_location, zone_id, zone_name } = formFields;
 
     // Basic validations for mandatory fields
     if (!first_name || !last_name || !email || !contact || !state_id || !city_id) {
@@ -54,6 +57,11 @@ const NewRegistrationScreen = () => {
       return toast.warning("Please enter a valid email address", { autoClose: 2500 });
     }
 
+    const selectedZone = zoneList.find(
+      (zone) => String(zone.zone_id) === String(zone_id)
+    );
+    const zoneName = (zone_name || selectedZone?.zone_name || "").trim();
+
     const payload = {
       db_name: clientData?.db_name,
       first_name: first_name.trim(),
@@ -63,8 +71,12 @@ const NewRegistrationScreen = () => {
       state_id: Number(state_id),
       city_id: Number(city_id),
       Operating_Location: (operating_location || "").trim(),
+      zone_name: zoneName,
       client_url: "http://18.61.246.105",
     };
+    if (selectedZone?.zone_id !== undefined && selectedZone?.zone_id !== "") {
+      payload.zone_id = Number(selectedZone.zone_id);
+    }
 
     console.log(payload);
     try {
@@ -184,6 +196,73 @@ const NewRegistrationScreen = () => {
     }
   };
 
+  const readStoredZones = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem("zone-master-list") || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const getZoneList = async (dbName) => {
+    const db_name = dbName || clientData?.db_name || getCookie("db_name") || "";
+    const active = (list) =>
+      (Array.isArray(list) ? list : []).filter(
+        (zone) =>
+          zone?.zone_name &&
+          zone?.status !== false &&
+          zone?.status !== 0 &&
+          !zone?.deletedAt
+      );
+
+    try {
+      const token = getCookie("token");
+      if (token) {
+        const headers = {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          pass: "pass",
+        };
+        if (db_name) headers.db = db_name;
+        const response = await axios.get(`${Baseurl}/db/channel/zone-master`, { headers });
+        const remote = active(
+          Array.isArray(response.data?.data) ? response.data.data : response.data
+        );
+        if (remote.length) {
+          setZoneList(remote);
+          try {
+            localStorage.setItem("zone-master-list", JSON.stringify(remote));
+          } catch (error) {
+            // ignore storage failures
+          }
+          axios
+            .post("/api/public-zones/", { db_name, zones: remote })
+            .catch(() => {});
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching zones:", error);
+    }
+
+    try {
+      const { data } = await axios.get(
+        `/api/public-zones/?db=${encodeURIComponent(db_name)}`
+      );
+      const published = active(data?.data);
+      if (published.length) {
+        setZoneList(published);
+        return;
+      }
+    } catch (error) {
+      console.error("Error fetching published zones:", error);
+    }
+
+    const stored = active(readStoredZones());
+    if (stored.length) setZoneList(stored);
+  };
+
   useEffect(() => {
     const getSignInData = async () => {
       try {
@@ -198,7 +277,12 @@ const NewRegistrationScreen = () => {
     }
     getSignInData();
     getStateList();
+    getZoneList();
   }, []);
+
+  useEffect(() => {
+    if (clientData?.db_name) getZoneList(clientData.db_name);
+  }, [clientData?.db_name]);
 
   useEffect(() => {
     if (formFields.state_id) {
@@ -491,6 +575,45 @@ const NewRegistrationScreen = () => {
                               onChange={(e) => {
                                 const value = e.target.value.slice(0, 100);
                                 setFormFields({ ...formFields, operating_location: value });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className="rowTab">
+                          <div className="labels">
+                            <label id="zone-label" htmlFor="zone_id">
+                              Zone
+                            </label>
+                          </div>
+                          <div className="rightTab">
+                            <Select
+                              id="zone_id"
+                              options={zoneList.map((zone) => ({
+                                value: zone.zone_id,
+                                label: zone.zone_name,
+                              }))}
+                              value={zoneList
+                                .map((zone) => ({
+                                  value: zone.zone_id,
+                                  label: zone.zone_name,
+                                }))
+                                .find((option) => String(option.value) === String(formFields.zone_id)) || null}
+                              onChange={(e) => {
+                                setFormFields({
+                                  ...formFields,
+                                  zone_id: e ? e.value : "",
+                                  zone_name: e ? e.label : "",
+                                });
+                              }}
+                              placeholder="Select Zone"
+                              isClearable
+                              styles={{
+                                control: (base) => ({
+                                  ...base,
+                                  minHeight: "40px",
+                                  border: "1px solid #ced4da",
+                                  borderRadius: "4px",
+                                }),
                               }}
                             />
                           </div>

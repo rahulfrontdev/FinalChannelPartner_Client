@@ -9,9 +9,9 @@ import { useSelector } from "react-redux";
 import { Baseurl, RM_ROLE_ID, isRmRole } from "../../Utils/Constants";
 import ConfirmBox from "../Basics/ConfirmBox";
 import ProjectManagementTable from "./ProjectManagementTable";
+import { getZoneList } from "../../Utils/zoneMasterApi";
 
 const PROJECT_MASTER_API = `${Baseurl}/db/channel/project-master`;
-const ZONE_OPTIONS = ["North", "South", "East", "West"];
 const EMPTY_FORM = {
   project_id: "",
   project_name: "",
@@ -83,6 +83,7 @@ const ProjectManagementScreen = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [rmDetailsShow, setRmDetailsShow] = useState(false);
   const [rmDetailsRows, setRmDetailsRows] = useState([]);
+  const [zoneList, setZoneList] = useState([]);
 
   const authHeader = () => {
     const token = getCookie("token");
@@ -291,10 +292,24 @@ const ProjectManagementScreen = () => {
     }
   };
 
+  const getZones = async () => {
+    if (!hasCookie("token")) return;
+    try {
+      const list = await getZoneList(authHeader());
+      setZoneList(list.filter((zone) => zone.status !== false && zone.zone_name));
+    } catch (error) {
+      setZoneList([]);
+      toast.error(error?.response?.data?.message || "Failed to load zones", {
+        autoClose: 2500,
+      });
+    }
+  };
+
   useEffect(() => {
     getProjects();
     getStates();
     getRmUsers();
+    getZones();
   }, []);
 
   useEffect(() => {
@@ -386,6 +401,7 @@ const ProjectManagementScreen = () => {
     setErrors({});
     setCityList([]);
     setShow(true);
+    getZones();
   };
 
   const openEditModal = (row, viewOnly = false) => {
@@ -442,6 +458,11 @@ const ProjectManagementScreen = () => {
     formData.rm_ids.map(String).includes(String(opt.value))
   );
   const selectedRmNames = selectedRmOptions.map((opt) => opt.label).filter(Boolean);
+  const zoneNames = zoneList.map((zone) => zone.zone_name).filter(Boolean);
+  const zoneOptions =
+    formData.zone && !zoneNames.includes(formData.zone)
+      ? [formData.zone, ...zoneNames]
+      : zoneNames;
 
   const buildPayload = () => ({
     project_id: formData.project_id || undefined,
@@ -593,7 +614,7 @@ const ProjectManagementScreen = () => {
                   onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
                 >
                   <option value="">Select Zone</option>
-                  {ZONE_OPTIONS.map((zone) => (
+                  {zoneOptions.map((zone) => (
                     <option key={zone} value={zone}>
                       {zone}
                     </option>
