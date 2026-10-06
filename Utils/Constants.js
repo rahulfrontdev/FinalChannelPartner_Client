@@ -173,3 +173,79 @@ export const mapCpVisitHistoryItem = (item, fallbackProjectName = "") => {
       .join(" - "),
   };
 };
+
+/** Same labels as the Visit Detail status column. */
+export const getCpVisitStatusLabel = (item = {}) => {
+  const mapped = mapCpVisitHistoryItem(item);
+  const statusRaw =
+    item?.visit_status ||
+    item?.current_stage ||
+    item?.stage ||
+    item?.status ||
+    "";
+  const statusKey = String(statusRaw).toLowerCase().trim();
+  const apiVisitStatus = String(item?.visit_status || "").trim().toLowerCase();
+  const isOpenSchedule =
+    statusKey === "visit" ||
+    statusKey === "upcoming" ||
+    statusKey.includes("schedule") ||
+    statusKey === "";
+
+  const hasRealActivation = Boolean(
+    item?.activation_date ||
+      item?.activation_time ||
+      item?.visit_verified_at ||
+      item?.code_verified_at ||
+      item?.visit_code_verified_at ||
+      item?.activation_at
+  );
+  const hasCompletedStatus = statusKey === "completed" || statusKey === "complete";
+  const hasVerifiedFlag =
+    item?.visit_verified === 1 ||
+    item?.visit_verified === true ||
+    item?.visit_verified === "1";
+
+  const scheduleDate = normalizeCpDateValue(mapped.scheduled_date);
+  const oldActivationDate = normalizeCpDateValue(
+    item?.activation_date ||
+      item?.visit_verified_at ||
+      item?.code_verified_at ||
+      item?.visit_code_verified_at ||
+      item?.activation_at ||
+      ""
+  );
+  const looksRescheduled =
+    Boolean(scheduleDate) &&
+    Boolean(oldActivationDate) &&
+    scheduleDate > oldActivationDate &&
+    (isOpenSchedule || hasVerifiedFlag || hasRealActivation);
+
+  const isCompleted =
+    apiVisitStatus === "completed" ||
+    (
+      !looksRescheduled &&
+      (hasCompletedStatus ||
+        hasRealActivation ||
+        (hasVerifiedFlag && !isOpenSchedule))
+    );
+
+  const otpSent =
+    !isCompleted &&
+    (
+      item?.otp_sent === 1 ||
+      item?.otp_sent === true ||
+      item?.visit_code_sent === 1 ||
+      item?.visit_code_sent === true ||
+      item?.code_sent === 1 ||
+      item?.code_sent === true ||
+      Boolean(item?.visit_code_sent_at) ||
+      Boolean(item?.otp_sent_at) ||
+      Boolean(item?.code_sent_at) ||
+      statusKey.includes("progress") ||
+      statusKey.includes("not completed")
+    );
+
+  if (isCompleted) return "Completed";
+  if (otpSent) return "Not Completed";
+  return "Scheduled Visit";
+};

@@ -74,6 +74,7 @@ const ProjectManagementScreen = () => {
   const [loader, setLoader] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dataList, setDataList] = useState([]);
+  const [search, setSearch] = useState("");
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [stateList, setStateList] = useState([]);
@@ -395,6 +396,30 @@ const ProjectManagementScreen = () => {
     return "Create Project";
   }, [mode]);
 
+  const filteredList = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return dataList;
+    return dataList.filter((row) => {
+      const rmNames = Array.isArray(row?.rm_names)
+        ? row.rm_names.join(" ")
+        : `${row?.rm_name || ""} ${row?.assigned_rm_name || ""}`;
+      const haystack = [
+        row?.project_name,
+        row?.zone,
+        row?.country,
+        row?.state_name,
+        row?.state,
+        row?.city_name,
+        row?.city,
+        rmNames,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [dataList, search]);
+
   const openCreateModal = () => {
     setMode("create");
     setFormData(EMPTY_FORM);
@@ -437,7 +462,6 @@ const ProjectManagementScreen = () => {
     if (!formData.country?.trim()) next.country = "Country is required";
     if (!formData.state_id) next.state_id = "State is required";
     if (!formData.city_id) next.city_id = "City is required";
-    if (!formData.rm_ids?.length) next.rm_ids = "RM is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -561,7 +585,18 @@ const ProjectManagementScreen = () => {
 
       <div className="main_content">
         <div className="table_screen">
-          <div className="top_btn_sec d-flex justify-content-end mb-3">
+          <div
+            className="top_btn_sec d-flex align-items-center mb-3 gap-3"
+            style={{ justifyContent: "space-between" }}
+          >
+            <Form.Control
+              type="search"
+              placeholder="Search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search projects"
+              style={{ maxWidth: 280 }}
+            />
             <button
               className="btn btn-primary Add_btn"
               style={{ background: "#2563eb", borderColor: "#2563eb" }}
@@ -572,7 +607,7 @@ const ProjectManagementScreen = () => {
           </div>
 
           <ProjectManagementTable
-            dataList={dataList}
+            dataList={filteredList}
             loader={loader}
             onView={(row) => openEditModal(row, true)}
             onEdit={(row) => openEditModal(row, false)}
