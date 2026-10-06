@@ -475,11 +475,6 @@ const ActivePartnersScreen = () => {
         ...(usersList?.filter(user => isBstRole(user.role_id))?.map(mapUserOption) || []),
     ];
 
-    const getRmUserOptions = () => [
-        { value: userInfo?.user_id, label: "N.A" },
-        ...(usersList?.filter(user => isRmRole(user.role_id))?.map(mapUserOption) || []),
-    ];
-
     const userListFilterBasisOfRole = (selectedOption, usersList) => {
         if (selectedOption === "BST") {
             return [{ value: userInfo?.user_id, label: "N.A" }, ...usersList
@@ -679,35 +674,6 @@ const ActivePartnersScreen = () => {
                                                 onChange={(e) => {
                                                     setoldAssignTo(e?.value || "")
                                                     if (e?.value) setoldAssignToRm("")
-                                                }}
-                                                styles={{
-                                                    control: (base) => ({
-                                                        ...base,
-                                                        minHeight: '38px',
-                                                    }),
-                                                    menu: (base) => ({
-                                                        ...base,
-                                                        zIndex: 9999,
-                                                    }),
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-xl-12 col-md-12 col-sm-12 col-12 mt-3">
-                                        <div className="input_box">
-                                            <label className="form-label">Assign To (RM)</label>
-                                            <Select
-                                                id="select-rm"
-                                                isSearchable={true}
-                                                isClearable={true}
-                                                placeholder="Search and select RM user..."
-                                                noOptionsMessage={() => "No RM users found"}
-                                                filterOption={userSearchFilterOption}
-                                                value={getSelectValue(oldAssignToRm)}
-                                                options={getRmUserOptions()}
-                                                onChange={(e) => {
-                                                    setoldAssignToRm(e?.value || "")
-                                                    if (e?.value) setoldAssignTo("")
                                                 }}
                                                 styles={{
                                                     control: (base) => ({

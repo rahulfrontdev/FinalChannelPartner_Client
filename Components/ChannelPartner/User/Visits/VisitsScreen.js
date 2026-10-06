@@ -217,9 +217,7 @@ const VisitsScreen = () => {
       const isAdmin = isAdminUser(userInfoCheck);
       const isBst = isBstRole(userInfoCheck?.role_id);
       let url = `/db/channelPartnerLeads?db_name=${db_name}&visit_list=true`;
-      if (isRmRole(userInfoCheck?.role_id)) {
-        url += `&source=ONBOARDED_CP_VISIT`;
-      } else if (!isAdmin && !isBst) {
+      if (!isRmRole(userInfoCheck?.role_id) && !isAdmin && !isBst) {
         url += `&source=CP_LEAD_VISIT`;
       }
 
