@@ -35,6 +35,7 @@ const ZoneManagementScreen = () => {
   const [loader, setLoader] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dataList, setDataList] = useState([]);
+  const [search, setSearch] = useState("");
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -78,6 +79,19 @@ const ZoneManagementScreen = () => {
     if (mode === "view") return "View Zone";
     return "Create Zone";
   }, [mode]);
+
+  const filteredList = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return dataList;
+    return dataList.filter((row) => {
+      const status = row?.status ? "active" : "inactive";
+      const haystack = [row?.zone_name, row?.description, status]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [dataList, search]);
 
   const openCreateModal = () => {
     setMode("create");
@@ -216,7 +230,18 @@ const ZoneManagementScreen = () => {
 
       <div className="main_content">
         <div className="table_screen">
-          <div className="top_btn_sec d-flex justify-content-end mb-3">
+          <div
+            className="top_btn_sec d-flex align-items-center mb-3 gap-3"
+            style={{ justifyContent: "space-between" }}
+          >
+            <Form.Control
+              type="search"
+              placeholder="Search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search zones"
+              style={{ maxWidth: 280 }}
+            />
             <button
               className="btn btn-primary Add_btn"
               style={{ background: "#2563eb", borderColor: "#2563eb" }}
@@ -227,7 +252,7 @@ const ZoneManagementScreen = () => {
           </div>
 
           <ZoneManagementTable
-            dataList={dataList}
+            dataList={filteredList}
             loader={loader}
             onView={(row) => openEditModal(row, true)}
             onEdit={(row) => openEditModal(row, false)}

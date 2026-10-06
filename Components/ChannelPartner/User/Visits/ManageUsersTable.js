@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { Button, Modal } from 'react-bootstrap';
 import Select from 'react-select';
 import axios from 'axios';
-import { Baseurl, getVisitDateLabel, showCpVisitScheduleColumns } from '../../../../Utils/Constants';
+import { Baseurl, getCpVisitStatusLabel, getVisitDateLabel, showCpVisitScheduleColumns } from '../../../../Utils/Constants';
 import { getCookie, hasCookie, setCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
 import PlusIcon from '../../../Svg/PlusIcon';
@@ -762,11 +762,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
               ? item.assigned_to
               : "") ||
             "";
-          const status =
-            item?.visit_status ||
-            item?.status ||
-            item?.stage ||
-            "";
+          const status = getCpVisitStatusLabel(item);
           reportRows.push([
             isFirst ? lead.cpl_id : "",
             isFirst ? leadName : "",
