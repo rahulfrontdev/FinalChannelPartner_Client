@@ -506,7 +506,10 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     selectableRows: 'none',
     responsive: "standard",
     onRowSelectionChange: handleRowClick,
-    downloadOptions: { filename: "ChannelBrokerage" },
+    downloadOptions: {
+      filename: "ChannelBrokerage",
+      filterOptions: { useDisplayedRowsOnly: true },
+    },
     filterType: 'multiselect',
     viewColumns: false,
     onDownload: (buildHead, buildBody, columns, data) => {
