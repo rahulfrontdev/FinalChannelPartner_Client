@@ -514,7 +514,10 @@ async function handleDelete(rowsDeleted) {
     responsive: "standard",
     // onRowSelectionChange : handleRowClick,
     onRowsDelete: handleDelete,
-    downloadOptions:{filename:"PendingRequestList"},
+    downloadOptions: {
+      filename: "PendingRequestList",
+      filterOptions: { useDisplayedRowsOnly: true },
+    },
     filterType:'multiselect',
     viewColumns: false,
     customSearch: customTableSearch,

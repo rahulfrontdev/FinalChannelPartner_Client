@@ -256,7 +256,10 @@ export const OpenReport = (startDate) => {
         responsive: "standard",
         // onRowSelectionChange : handleRowClick,
         // onRowsDelete: handleDelete,
-        downloadOptions:{filename:"ChannelPartnerList"},
+        downloadOptions:{
+          filename:"ChannelPartnerList",
+          filterOptions: { useDisplayedRowsOnly: true },
+        },
         // enableNestedDataAccess:".",
         // filterType:'multiselect',
         viewColumns: true,

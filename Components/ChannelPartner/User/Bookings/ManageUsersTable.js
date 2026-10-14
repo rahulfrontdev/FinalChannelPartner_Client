@@ -525,7 +525,10 @@ const [value, setValue] = useState(getCurrentWeekDates());
     selectableRows: 'none',
     responsive: "standard",
     onRowSelectionChange: handleRowClick,
-    downloadOptions:{filename:"ChannelBookings"},
+    downloadOptions:{
+      filename:"ChannelBookings",
+      filterOptions: { useDisplayedRowsOnly: true },
+    },
     filterType:'multiselect',
     viewColumns: false,
     onDownload: (buildHead, buildBody, columns, data) => {

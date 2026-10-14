@@ -651,7 +651,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
         setUserData([...data]); 
     };
 
-    const downloadCpVisitReport = async () => {
+    const downloadCpVisitReport = async (visibleIds) => {
       if (!hasCookie("token")) {
         toast.error("Please login again", { autoClose: 2500 });
         return;
@@ -670,9 +670,13 @@ const [value, setValue] = useState(getCurrentWeekDates());
       };
 
       const leadMap = {};
+      const allowedIds = Array.isArray(visibleIds)
+        ? new Set(visibleIds.map((id) => String(id)))
+        : null;
       (Array.isArray(dataList) ? dataList : []).forEach((list) => {
         const cplId = list?.cpl_id;
         if (cplId == null || leadMap[cplId]) return;
+        if (allowedIds && !allowedIds.has(String(cplId))) return;
         leadMap[cplId] = {
           cpl_id: cplId,
           leadName:
@@ -842,13 +846,21 @@ const [value, setValue] = useState(getCurrentWeekDates());
         selectableRows: 'none',
         responsive: "standard",
         onRowSelectionChange : handleRowClick,
-        downloadOptions:{filename:"ChannelVisits"},
+        downloadOptions:{
+          filename:"ChannelVisits",
+          filterOptions: { useDisplayedRowsOnly: true },
+        },
         filterType:'multiselect',
         viewColumns: false,
         customSearch: customTableSearch,
         onDownload: (buildHead, buildBody, columns, data) => {
               if (visitType === "cp") {
-                downloadCpVisitReport();
+                const idIndex = (columns || []).findIndex((col) => col.name === "cpl_id");
+                const visibleIds = (data || []).map((row) => {
+                  const cplId = idIndex >= 0 ? row?.data?.[idIndex] : null;
+                  return cplId == null || typeof cplId === "object" ? null : cplId;
+                }).filter((id) => id != null && id !== "");
+                downloadCpVisitReport(visibleIds);
                 return false;
               }
               const workbook = XLSX.utils.book_new();
@@ -952,7 +964,10 @@ const [value, setValue] = useState(getCurrentWeekDates());
                     columns={activeColumns}
                     options={{
                       ...options,
-                      downloadOptions: { filename: downloadFileName },
+                      downloadOptions: {
+                        filename: downloadFileName,
+                        filterOptions: { useDisplayedRowsOnly: true },
+                      },
                       customFilterDialogFooter: () => (
                         <div
                           style={{

@@ -399,14 +399,15 @@ const CPRegisterLeadsTable = ({
   };
 
   // Custom download function with all history remarks
-  const handleCustomDownload = async () => {
+  const handleCustomDownload = async (leads) => {
+    const rowsToExport = Array.isArray(leads) ? leads : (Array.isArray(dataList) ? dataList : []);
     setIsDownloading(true);
     toast.info("Fetching all history data. Please wait...", { autoClose: 2000 });
 
     try {
-      // Fetch history for all leads
+      // Fetch history for the rows currently shown in the table
       const leadsWithHistory = await Promise.all(
-        dataList.map(async (lead) => {
+        rowsToExport.map(async (lead) => {
           const history = await fetchLeadHistory(lead.cpl_id);
 
           // Get latest remark (first item in history is usually the latest)
@@ -1018,7 +1019,12 @@ const CPRegisterLeadsTable = ({
   const options = {
     selectableRows: 'none',
     responsive: "standard",
-    downloadOptions: { filename: "CPRegistrationList" },
+    downloadOptions: {
+      filename: "CPRegistrationList",
+      filterOptions: {
+        useDisplayedRowsOnly: true,
+      },
+    },
     filterType: 'multiselect',
     viewColumns: false,
     customSearch: customTableSearch,
@@ -1026,8 +1032,14 @@ const CPRegisterLeadsTable = ({
       <div style={{ minWidth: "400px" }} />
     ),
     // Use original download icon but trigger custom download
-    onDownload: () => {
-      handleCustomDownload();
+    onDownload: (buildHead, buildBody, columns, data) => {
+      const idIndex = (columns || []).findIndex((col) => col.name === "cpl_id");
+      const visibleLeads = (data || []).map((row) => {
+        const cplId = idIndex >= 0 ? row?.data?.[idIndex] : null;
+        if (cplId == null || typeof cplId === "object") return null;
+        return (dataList || []).find((lead) => String(lead.cpl_id) === String(cplId));
+      }).filter(Boolean);
+      handleCustomDownload(visibleLeads);
       return false; // Prevent default download
     }
   };

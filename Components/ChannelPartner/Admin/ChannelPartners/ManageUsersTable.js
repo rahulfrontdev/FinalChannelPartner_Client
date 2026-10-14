@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import MUIDataTable from "mui-datatables";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -76,6 +76,15 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const [partnerTypes, setPartnerTypes] = useState([])
   const [errorToast, setErrorToast] = useState(false);
   const [showAssignRm, setShowAssignRm] = useState(false);
+  const [showRmAssign, setShowRmAssign] = useState(false);
+  const [rmAssignUserId, setRmAssignUserId] = useState("");
+  const [rmUserOptions, setRmUserOptions] = useState([]);
+  const [rmUsersLoading, setRmUsersLoading] = useState(false);
+  const [selectedRmUser, setSelectedRmUser] = useState(null);
+  const [rmAssignSaving, setRmAssignSaving] = useState(false);
+  const [rmNameByCode, setRmNameByCode] = useState({});
+  const rmAssignCodeRef = useRef("");
+  const rmAssignOverrideRef = useRef({});
   const [assignRmUserId, setAssignRmUserId] = useState("");
   const [zoneList, setZoneList] = useState([]);
   const [projectList, setProjectList] = useState([]);
@@ -566,6 +575,100 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     if (userId) loadCpAssignments(userId);
   };
 
+  const closeRmAssign = () => {
+    setShowRmAssign(false);
+    setRmAssignUserId("");
+    setSelectedRmUser(null);
+    setRmUserOptions([]);
+  };
+
+  const openRmAssign = async (userCode) => {
+    const row = dataList?.find((item) => item?.user_code === userCode);
+    const userId = row?.user_id;
+    if (!userId) {
+      toast.error("Channel Partner not found", { autoClose: 2500 });
+      return;
+    }
+    rmAssignCodeRef.current = userCode;
+    setRmAssignUserId(userId);
+    setSelectedRmUser(null);
+    setRmUserOptions([]);
+    setShowRmAssign(true);
+    setRmUsersLoading(true);
+    try {
+      const response = await axios.get(
+        `${Baseurl}/db/channel/cp-project-assign/rm-list?user_id=${userId}`,
+        authHeader()
+      );
+      const users = Array.isArray(response?.data?.data) ? response.data.data : [];
+      const options = users.map((user) => ({
+        value: user.user_id,
+        label: user.name || user.user || user.email || `User ${user.user_id}`,
+        is_current: !!user.is_current,
+      }));
+      setRmUserOptions(options);
+      setSelectedRmUser(options.find((option) => option.is_current) || null);
+    } catch (error) {
+      setRmUserOptions([]);
+      toast.error(error?.response?.data?.message || "Failed to load RM list", { autoClose: 2500 });
+    } finally {
+      setRmUsersLoading(false);
+    }
+  };
+
+  const submitRmAssign = async () => {
+    if (!rmAssignUserId || !selectedRmUser?.value) {
+      toast.error("Select an RM", { autoClose: 2500 });
+      return;
+    }
+    if (!hasCookie("token")) return;
+    setRmAssignSaving(true);
+    try {
+      const response = await axios.put(
+        `${Baseurl}/db/channel/cp-project-assign/reassign-rm`,
+        {
+          user_id: Number(rmAssignUserId),
+          rm_id: Number(selectedRmUser.value),
+        },
+        authHeader()
+      );
+      const payload = response?.data?.data || {};
+      const assignedRm = Array.isArray(payload.assigned_rm) ? payload.assigned_rm : [];
+      const userId = String(rmAssignUserId);
+      const assignedName =
+        formatAssignmentNames(assignedRm) ||
+        payload?.new_rm?.name ||
+        selectedRmUser?.label ||
+        "";
+      if (userId && assignedName) {
+        const savedAssignments = assignedRm.length
+          ? assignedRm
+          : [{ rm_name: assignedName, rm_names: [assignedName] }];
+        rmAssignOverrideRef.current[userId] = savedAssignments;
+        if (rmAssignCodeRef.current) {
+          setRmNameByCode((prev) => ({
+            ...prev,
+            [rmAssignCodeRef.current]: assignedName,
+          }));
+        }
+        setAssignmentMap((prev) => ({
+          ...prev,
+          [userId]: assignedName,
+        }));
+        setAssignmentDetails((prev) => ({
+          ...prev,
+          [userId]: savedAssignments,
+        }));
+      }
+      toast.success(response?.data?.message || "Channel Partner assigned", { autoClose: 2500 });
+      closeRmAssign();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to assign RM", { autoClose: 2500 });
+    } finally {
+      setRmAssignSaving(false);
+    }
+  };
+
   const closeAssignRm = () => {
     setShowAssignRm(false);
     setAssignRmUserId("");
@@ -630,21 +733,6 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     }
   };
 
-  const removeAssignment = async (projectId) => {
-    if (!assignRmUserId || !projectId || !hasCookie("token")) return;
-    try {
-      const response = await axios.delete(
-        `${CP_PROJECT_ASSIGN_API}?user_id=${assignRmUserId}&project_id=${projectId}`,
-        authHeader()
-      );
-      const assignments = response?.data?.data?.assignments || [];
-      applyAssignments(assignRmUserId, assignments);
-      toast.success(response?.data?.message || "Project removed from Channel Partner", { autoClose: 2500 });
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to remove project", { autoClose: 2500 });
-    }
-  };
-
   useEffect(() => {
     if (!(isBstProfile || isRmRole(userInfo?.role_id)) || !Array.isArray(dataList) || !dataList.length || !hasCookie("token")) return;
     let cancelled = false;
@@ -668,14 +756,20 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       setAssignmentMap((prev) => {
         const next = { ...prev };
         entries.filter(Boolean).forEach(([userId, assignments]) => {
-          next[userId] = formatAssignmentNames(assignments);
+          const key = String(userId);
+          const override = rmAssignOverrideRef.current[key];
+          const overrideName = override ? formatAssignmentNames(override) : "";
+          const fetchedName = formatAssignmentNames(assignments);
+          next[key] = overrideName || fetchedName;
         });
         return next;
       });
       setAssignmentDetails((prev) => {
         const next = { ...prev };
         entries.filter(Boolean).forEach(([userId, assignments]) => {
-          next[userId] = assignments;
+          const key = String(userId);
+          const override = rmAssignOverrideRef.current[key];
+          next[key] = override || assignments;
         });
         return next;
       });
@@ -975,7 +1069,9 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
           </th>
         ),
         customBodyRender: (value, tableMeta) => {
-          const names = String(value || "")
+          const userCode = tableMeta?.rowData?.[0];
+          const liveName = rmNameByCode[userCode];
+          const names = String(liveName || value || "")
             .split(",")
             .map((name) => name.trim())
             .filter(Boolean);
@@ -986,7 +1082,6 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
               </div>
             );
           }
-          const userCode = tableMeta?.rowData?.[0];
           const cp = dataList?.find((item) => item?.user_code === userCode);
           return (
             <div className='status_box fw-bold text-center' style={{ color: "#293790" }}>
@@ -1109,7 +1204,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             const row = dataList?.find((item) => item?.user_code === value);
             const canSchedule = row?.cpl_id != null && row?.cpl_id !== "";
             return (
-              <div className="table_btns justify-content-center align-items-center">
+              <div className="table_btns justify-content-center align-items-center gap-2">
                 <button
                   className="action_btn"
                   title={canSchedule ? "Schedule Visit" : "Lead record not found"}
@@ -1117,6 +1212,14 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                   onClick={() => canSchedule && openScheduleVisit(value)}
                 >
                   <EditIcon />
+                </button>
+                <button
+                  onClick={() => openRmAssign(value)}
+                  style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
+                  className="pe-3 ps-3"
+                  title="Assign to"
+                >
+                  Assign to
                 </button>
               </div>
             );
@@ -1350,7 +1453,10 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     responsive: "standard",
     // onRowSelectionChange : handleRowClick,
     onRowsDelete: handleDelete,
-    downloadOptions: { filename: "ChannelPartnerList" },
+    downloadOptions: {
+      filename: "ChannelPartnerList",
+      filterOptions: { useDisplayedRowsOnly: true },
+    },
     enableNestedDataAccess: ".",
     filterType: 'multiselect',
     viewColumns: false,
@@ -1489,7 +1595,12 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     ...list,
     cpt_id: list?.cpt_id, // Preserve the actual cpt_id value, don't overwrite with role_name
     reportToUser: [list?.reportToUser?.user]?.filter(d => d !== null && d !== undefined),
-    assignedToRm: assignmentMap[list?.user_id] || rmNamesFromUser(list) || "",
+    assignedToRm: (() => {
+      const key = String(list?.user_id ?? "");
+      const saved = rmAssignOverrideRef.current[key];
+      const savedName = rmNameByCode[list?.user_code] || (saved ? formatAssignmentNames(saved) : "");
+      return savedName || assignmentMap[key] || assignmentMap[list?.user_id] || rmNamesFromUser(list) || "";
+    })(),
     user_status: list?.user_status ? "active" : "inactive",
     db_user_profile: [list?.db_user_profile?.db_designation?.designation]?.filter(d => d !== null && d !== undefined),
     reportToUserId: list?.reportToUser?.user_id,
@@ -1504,6 +1615,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
           (
             <div className="miuiTable channelTable">
               <MUIDataTable
+                key={`${Object.entries(rmNameByCode).map(([code, name]) => `${code}:${name}`).join("|")}|${mappedDataList.map((row) => `${row.user_code}:${row.assignedToRm}`).join("|")}`}
                 title={<CustomToolbar />}
                 data={mappedDataList}
                 // data={mappedDataList}
@@ -1715,13 +1827,6 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                         <div className="fw-bold">{item.project || item.project_name}</div>
                         <div>{item.rm_name || formatAssignmentNames([item]) || "-"}</div>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-danger rounded-5"
-                        onClick={() => removeAssignment(item.project_id)}
-                      >
-                        Remove
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -1740,6 +1845,46 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             disabled={assignRmSaving}
           >
             {assignRmSaving ? "Submitting..." : "Submit"}
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal className="commonModal" show={showRmAssign} onHide={closeRmAssign}>
+        <Modal.Header closeButton>
+          <Modal.Title>Assign To</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="add_user_form">
+            <div className="input_box">
+              <label className="form-label">Assign To (RM)</label>
+              <Select
+                isSearchable
+                isClearable
+                isLoading={rmUsersLoading}
+                placeholder={rmUsersLoading ? "Loading RM users..." : "Search and select RM user..."}
+                noOptionsMessage={() => (rmUsersLoading ? "Loading RM users..." : "No RM users found")}
+                options={rmUserOptions}
+                value={selectedRmUser}
+                onChange={(option) => setSelectedRmUser(option || null)}
+                styles={{
+                  control: (base) => ({ ...base, minHeight: "38px" }),
+                  menu: (base) => ({ ...base, zIndex: 9999 }),
+                }}
+              />
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer className="d-flex flex-wrap justify-content-end gap-2">
+          <button className="btn btn-danger rounded-5" onClick={closeRmAssign} disabled={rmAssignSaving}>
+            Cancel
+          </button>
+          <button
+            style={{ background: clientBtnColor }}
+            className="btn rounded-5 text-white"
+            onClick={submitRmAssign}
+            disabled={rmAssignSaving || rmUsersLoading || !selectedRmUser}
+          >
+            {rmAssignSaving ? "Submitting..." : "Submit"}
           </button>
         </Modal.Footer>
       </Modal>

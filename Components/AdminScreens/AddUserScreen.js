@@ -231,12 +231,6 @@ const AddUserScreen = () => {
         isMEDIA: false
       }
     }
-    if (userInfo?.role_id > 3) {
-      data = {
-        ...data,
-        isCHANNEL: false,
-      }
-    }
     setisLoading(true);
     const token = getCookie("token");
     const db_name = getCookie("db_name");
@@ -311,12 +305,6 @@ const AddUserScreen = () => {
         isSALES: false,
         isDMS: false,
         isMEDIA: false
-      }
-    }
-    if (userInfo?.role_id > 3) {
-      data = {
-        ...data,
-        isCHANNEL: false,
       }
     }
     setisLoading(true);

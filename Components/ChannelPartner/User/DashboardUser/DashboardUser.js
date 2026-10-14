@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import { useRouter } from "next/router";
 import DashLeadsCard from './DashLeadsCard'
+import RmDashboard from './RmDashboard'
 import { Baseurl, filesUrl, isRmRole } from '../../../../Utils/Constants';
 import moment from 'moment';
 import { useSelector } from 'react-redux';
@@ -349,6 +350,14 @@ const DashboardUser = () => {
                                             </div>
                                         </div>
                                         <div className="cards_Box">
+                                            {isRmRole(userInfoCheck?.role_id) ? (
+                                                <RmDashboard
+                                                    rm={dataList?.rm_dashboard}
+                                                    startDate={value?.startDate}
+                                                    endDate={value?.endDate}
+                                                />
+                                            ) : (
+                                            <>
                                             {
                                                 userInfoCheck?.role_id !== 2 && (
                                                 <div className="row leads_row addgap">
@@ -574,6 +583,8 @@ const DashboardUser = () => {
                                                 </>
                                                 // )
                                             }
+                                            </>
+                                            )}
 
 
                                             {

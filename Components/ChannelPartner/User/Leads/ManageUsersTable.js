@@ -649,10 +649,9 @@ const getVisitInfo=async(visitId)=>{
         onRowsDelete: handleDelete,
         downloadOptions:{
           filename:"ChannelLeads",
-          // filterOptions:{
-          //   useDisplayedColumnsOnly:true,
-          //   useDisplayedRowsOnly:true
-          // }
+          filterOptions:{
+            useDisplayedRowsOnly:true
+          }
         },
         filterType:'multiselect',
         viewColumns: false,
