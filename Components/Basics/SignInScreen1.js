@@ -7,7 +7,7 @@ import { setCookie } from 'cookies-next';
 import { useSelector, useDispatch } from 'react-redux';
 import { userMode } from '../../store/dbModeSlice';
 import { UserLogIN } from '../../store/ClientLoginSlice';
-import { Baseurl, filesUrl } from '../../Utils/Constants';
+import { Baseurl, ClientUrl, filesUrl } from '../../Utils/Constants';
 import axios from 'axios';
 import { validEmail } from '../../Utils/regex';
 import { assignPermissions, crm, dms, sales, channel } from '../../store/permissionSlice';
@@ -119,7 +119,7 @@ export default function SignInScreen({ setLoggedIn }) {
             try {
                 let baseUrl = window.location.origin;
                 if (baseUrl === "http://localhost:3000") {
-                    baseUrl = "https://srijanbandhan.com"
+                    baseUrl = ClientUrl
                 }
                 const { data } = await axios.post(Baseurl + "/db/admin/url", {
                     client_url: `${baseUrl}`,

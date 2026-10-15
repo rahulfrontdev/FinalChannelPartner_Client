@@ -13,7 +13,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { LoggedOut } from "../../store/adMinLoginSlice";
 import { userLogOut } from "../../store/ClientLoginSlice";
 import Link from "next/link";
-import { Baseurl, filesUrl, isRmRole } from "../../Utils/Constants";
+import { Baseurl, ClientUrl, filesUrl, isRmRole } from "../../Utils/Constants";
 import axios from "axios";
 import { clearMode, masterMode, userMode } from "../../store/dbModeSlice";
 import { channel, clearValue, crm, dms, sales, media } from "../../store/permissionSlice";
@@ -150,7 +150,7 @@ const Topnav = ({ topnavPermission }) => {
       try {
         let baseUrl = window.location.origin;
         if (baseUrl === "http://localhost:3000") {
-          baseUrl = "https://crm.saleofast.com"
+          baseUrl = ClientUrl
         }
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,

@@ -4,7 +4,7 @@ import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { hasCookie, getCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
-import { Baseurl, filesUrl } from "../Utils/Constants";
+import { Baseurl, ClientUrl, filesUrl } from "../Utils/Constants";
 import axios from 'axios'
 import { useDispatch, useSelector } from 'react-redux';
 import { startButtonLoading, stopButtonLoading } from '../store/buttonLoaderSlice';
@@ -74,8 +74,13 @@ export default ChannelPartnerHOC(
         const getSignInData=async()=>{
           try {
             let baseUrl = window.location.origin;
-            if(baseUrl==="http://localhost:3000"){
-              baseUrl="https://crm.saleofast.com"
+            if(
+              baseUrl==="http://localhost:3000" ||
+              baseUrl.startsWith("http://10.") ||
+              baseUrl.startsWith("http://192.168.") ||
+              baseUrl.startsWith("http://172.")
+            ){
+              baseUrl = ClientUrl;
             }
             const {data}=await axios.post(Baseurl+"/db/admin/url",{
               client_url:`${baseUrl}`,

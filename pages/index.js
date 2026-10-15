@@ -7,7 +7,7 @@ import { useRouter } from "next/router";
 import Loader from "../Components/Loader/Loader";
 import Link from "next/link";
 import { crm, dms, sales, channel, clearValue,media } from "../store/permissionSlice";
-import { Baseurl, filesUrl, isRmRole } from "../Utils/Constants";
+import { Baseurl, ClientUrl, filesUrl, isRmRole } from "../Utils/Constants";
 import { toast } from "react-toastify";
 import axios from "axios";
 import moment from "moment";
@@ -172,8 +172,13 @@ export default mainIndexHOC(
       const getSignInData = async () => {
         try {
           let baseUrl = window.location.origin;
-          if (baseUrl === "http://localhost:3000") {
-            baseUrl = "https://crm.saleofast.com";
+          if (
+            baseUrl === "http://localhost:3000" ||
+            baseUrl.startsWith("http://10.") ||
+            baseUrl.startsWith("http://192.168.") ||
+            baseUrl.startsWith("http://172.")
+          ) {
+            baseUrl = ClientUrl;
           }
           const { data } = await axios.post(Baseurl + "/db/admin/url", {
             client_url: `${baseUrl}`,

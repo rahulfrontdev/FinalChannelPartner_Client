@@ -61,6 +61,29 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const clientBtnColor = hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#293790"
   const [brokerageId, setBrokerageId] = useState("")
   const [rejectRemark, setRejectRemark] = useState(false)
+  const [sfSubmitting, setSfSubmitting] = useState(false)
+  const [submittedIds, setSubmittedIds] = useState([])
+
+  const getSubmittedIds = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("sfBrokerageSubmitted") || "[]");
+      return Array.isArray(saved) ? saved.map(String) : [];
+    } catch (_e) {
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    setSubmittedIds(getSubmittedIds());
+  }, []);
+
+  const markBrokerageSubmitted = (id) => {
+    if (!id) return;
+    const next = [...new Set([...getSubmittedIds(), String(id)])];
+    localStorage.setItem("sfBrokerageSubmitted", JSON.stringify(next));
+    setSubmittedIds(next);
+  };
+
   const [updateBill, setUpdateBill] = useState({
     date: "",
     amount: "",
@@ -70,7 +93,8 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     booking_name: "",
     status: "",
     bill_file: "",
-    reject_remark: null
+    reject_remark: null,
+    salesforce_bill_id: "",
   })
 
   const resetUpdateData = () => {
@@ -83,7 +107,8 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       booking_name: "",
       status: "",
       bill_file: "",
-      reject_remark: null
+      reject_remark: null,
+      salesforce_bill_id: "",
     })
     setRejectRemark(false)
   }
@@ -106,16 +131,25 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
 
       try {
         const response = await axios.get(Baseurl + `/db/channel/brokerage?brokerage_id=${brokerageId}`, header);
+        const loadedId = response?.data?.data?.brokerage_id;
+        const isSubmitted =
+          getSubmittedIds().includes(String(loadedId)) ||
+          response?.data?.data?.payment_status === "Submitted" ||
+          !!response?.data?.data?.salesforce_bill_id;
+        const brokerageStatus = response?.data?.data?.status === "Submitted"
+          ? "Bill Received"
+          : response?.data?.data?.status === 'Bill sent' ? 'Bill Received' : response?.data?.data?.status;
         setUpdateBill({
           ...updateBill,
           booking_name: response?.data?.data?.BrokerageBookingtData?.booking_name,
           amount: response?.data?.data?.amount,
-          status: response?.data?.data?.status === 'Bill sent' ? 'Bill Received' : response?.data?.data?.status,
+          status: brokerageStatus,
           date: response?.data?.data?.date,
           file: response?.data?.data?.bill_file,
           booking_id: response?.data?.data?.BrokerageBookingtData?.booking_id,
-          brokerage_id: response?.data?.data?.brokerage_id,
+          brokerage_id: loadedId,
           reject_remark: response?.data?.data?.reject_remark,
+          salesforce_bill_id: response?.data?.data?.salesforce_bill_id || (isSubmitted ? "submitted" : ""),
         })
       } catch (error) {
         if (error?.response?.data?.message) {
@@ -140,6 +174,58 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       setRoleId(Number(userInfoData.role_id))
     }
   }, []);
+
+  const submitBrokerageToSalesforce = async () => {
+    if (!updateBill?.brokerage_id) {
+      return toast.warning("Brokerage bill not loaded", { autoClose: 2500 });
+    }
+    if (!hasCookie("token")) return;
+
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    const header = {
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer ".concat(token),
+        db: db_name,
+        pass: "pass",
+        m_id: 79,
+      },
+    };
+
+    try {
+      setSfSubmitting(true);
+      const salesforceUrl =
+        typeof window !== "undefined" && window.location.hostname === "localhost"
+          ? "/api/channel/brokerage-salesforce"
+          : `${Baseurl}/db/channel/brokerage/salesforce`;
+      const response = await axios.post(
+        salesforceUrl,
+        { brokerage_id: updateBill.brokerage_id },
+        header
+      );
+      if (response.status === 200 || response.status === 201) {
+        toast.success(response?.data?.message || "Submitted to Salesforce", { autoClose: 2500 });
+        const sfId = response?.data?.data?.id;
+        markBrokerageSubmitted(updateBill.brokerage_id);
+        setUpdateBill((prev) => ({
+          ...prev,
+          salesforce_bill_id: sfId || prev.salesforce_bill_id || "submitted",
+        }));
+        setShowModal(false);
+        if (typeof getDataList === "function") getDataList();
+      } else {
+        toast.error(response?.data?.message || "Salesforce submit failed", { autoClose: 2500 });
+      }
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Salesforce submit failed",
+        { autoClose: 3500 }
+      );
+    } finally {
+      setSfSubmitting(false);
+    }
+  };
 
   const updateBrokerageBill = async () => {
     if (updateBill?.status == "Payment Rejected" && updateBill?.reject_remark == "") {
@@ -331,6 +417,36 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         }
       }
     },
+       {
+      name: 'payment_status',
+      label: "Payment Status",
+      options: {
+        filter: true,
+        customHeadRender: (columnMeta, updateDirection) => (
+          <th style={{ background: `${clientBtnColor}`, color: 'white', paddingLeft: "15px", padding: "8px" }}   >
+            {columnMeta.label}
+          </th>
+        ),
+        customBodyRender: (value, tableMeta, updateValue) => {
+          const isSubmitted = value === "Submitted";
+          return (
+            <div
+              style={{
+                background: isSubmitted ? "#2e7d32" : "violet",
+                width: "fit-content",
+                color: "white",
+                padding: "6px",
+                borderRadius: "20px",
+                border: "white",
+              }}
+              className='pe-3 ps-3'
+              title='Payment Status'>
+              {isSubmitted ? "Submitted" : value || "—"}
+            </div>
+          )
+        }
+      }
+    },
     {
       name: 'status',
       label: "Brokerage Status",
@@ -346,11 +462,8 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             <div
               style={{ background: "violet", width: "fit-content", color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
               className='pe-3 ps-3'
-              title='Assign - To'>
-
-              {
-                value == "Bill sent" ? "Bill Received" : value
-              }
+              title='Brokerage Status'>
+              {value == "Bill sent" ? "Bill Received" : value}
             </div>
           )
         }
@@ -581,7 +694,9 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     BrokerageBookingtDataContact: list?.BrokerageBookingtData?.contact_no,
     BrokerageBookingtDataProject: list?.BrokerageLeadData?.sales_project_name,
     BrokerageBookingtDataLocation: [list?.BrokerageBookingtData?.Location]?.filter(d => d !== null && d !== undefined),
-    status: list?.status == "Bill sent" ? "Bill Received" : list?.status
+    status: list?.status === "Submitted" || list?.status == "Bill sent" ? "Bill Received" : list?.status,
+    payment_status: list?.payment_status
+      || ((submittedIds.includes(String(list?.brokerage_id)) || list?.salesforce_bill_id) ? "Submitted" : "")
   }))
 
   return (
@@ -728,7 +843,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                                     </div>
                                   ) : ""
                                 }
-                                <div>
+                                <div className="d-flex align-items-center gap-2">
                                   {(roleId !== 2 && (
                                     <button
                                       type="button"
@@ -742,6 +857,19 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                                       Edit
                                     </button>
                                   ))}
+                                  <button
+                                    type="button"
+                                    className="btn text-white"
+                                    style={{ background: clientBtnColor }}
+                                    disabled={sfSubmitting || !!updateBill?.salesforce_bill_id}
+                                    onClick={submitBrokerageToSalesforce}
+                                  >
+                                    {sfSubmitting
+                                      ? "Submitting..."
+                                      : updateBill?.salesforce_bill_id
+                                        ? "Submitted"
+                                        : "Submit"}
+                                  </button>
                                 </div>
                               </div>
 

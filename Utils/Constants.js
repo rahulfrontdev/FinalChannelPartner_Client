@@ -14,10 +14,6 @@
 
 /* -----------------main links------------- */
 
-// export const Baseurl = 'http://localhost:8050/api/v1';
-// export const filesUrl = 'http://localhost:8050/images';
-
-
 // export const Baseurl = 'http://192.168.1.20:8050/api/v1';
 // export const filesUrl = 'http://192.168.1.20:8050/images';
 
@@ -26,12 +22,15 @@
 // export const Baseurl = 'https://admin.theprosperity.in/api/v1';
 // export const filesUrl = 'https://admin.theprosperity.in/images';
 
-export const Baseurl = 'http://18.61.246.105/api/v1';
-export const filesUrl = 'http://18.61.246.105/images';
+// Sandbox
+// export const Baseurl = 'http://18.61.246.105/api/v1';
+// export const filesUrl = 'http://18.61.246.105/images';
 
 // Local
-// export const Baseurl = 'http://localhost:8050/api/v1';
-// export const filesUrl = 'http://localhost:8050/images';
+export const Baseurl = 'http://localhost:8050/api/v1';
+export const filesUrl = 'http://localhost:8050/images';
+/** Registered tenant URL for /db/admin/url and login client_url (use on localhost too) */
+export const ClientUrl = 'http://18.61.246.105';
 
 /* RM role id — set per environment in .env (NEXT_PUBLIC_RM_ROLE_ID) */
 export const RM_ROLE_ID = Number(process.env.NEXT_PUBLIC_RM_ROLE_ID || 9);
@@ -55,6 +54,16 @@ export const isAdminUser = (userInfo) =>
   userInfo?.role_id == null ||
   !!userInfo?.isDB ||
   Number(userInfo?.role_id) === 3;
+
+/** CP lead left after Channel Partner self-delete (anonymized). Hide from C.P Leads. */
+export const isSelfDeletedCpLead = (lead) => {
+  if (!lead) return false;
+  const email = String(lead.email || "").toLowerCase();
+  if (email.endsWith("@deleted.local")) return true;
+  const first = String(lead.first_name || "").trim().toLowerCase();
+  const last = String(lead.last_name || "").trim().toLowerCase();
+  return first === "deleted" && last === "user";
+};
 
 /**
  * CP Visits UI: Scheduled Date/Time + Activation Date/Time

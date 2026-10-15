@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link';
 import axios from 'axios';
-import { Baseurl } from '../../../../Utils/Constants';
+import { Baseurl, isSelfDeletedCpLead } from '../../../../Utils/Constants';
 import { hasCookie, getCookie, setCookie } from 'cookies-next';
 import { toast } from 'react-toastify';
 import ConfirmBox from "../../../Basics/ConfirmBox";
@@ -168,7 +168,7 @@ const CPRegisterLeadsScreen = () => {
         console.log("response ", response.data.data)
         if (response?.status === 200 || response?.status === 201) {
           setLoader(false);
-          setDataList(response?.data?.data?.leads || []);
+          setDataList((response?.data?.data?.leads || []).filter((lead) => !isSelfDeletedCpLead(lead)));
         }
       } catch (error) {
         if (error?.response?.data?.message) {

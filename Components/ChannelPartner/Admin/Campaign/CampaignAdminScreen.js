@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import PlusIcon from "../../../Svg/PlusIcon";
 
@@ -12,6 +12,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { startButtonLoading, stopButtonLoading } from "../../../../store/buttonLoaderSlice";
 import Loader from "../../../Loader/Loader";
 import ConfirmBox from "../../../Basics/ConfirmBox";
+
+const MAX_KIT_FILE_BYTES = 500 * 1024 * 1024;
 
 const CampaignAdminScreen = () => {
   const [showModal, setShowModal] = useState(false);
@@ -39,10 +41,366 @@ const CampaignAdminScreen = () => {
   const dispatch = useDispatch()
   const { isButtonLoading } = useSelector((state) => state.buttonLoader)
   const [loader, setLoader] = useState(false)
+  const [activeTab, setActiveTab] = useState("digitalKit");
+  const [filesProjectId, setFilesProjectId] = useState("");
+  const [selectedProjectFiles, setSelectedProjectFiles] = useState([]);
+  const [digitalKits, setDigitalKits] = useState([]);
+  const [kitContactDetail, setKitContactDetail] = useState("");
+  const [kitReraNumber, setKitReraNumber] = useState("");
+  const [kitLogoFile, setKitLogoFile] = useState(null);
+  const [kitLogoPreview, setKitLogoPreview] = useState("");
+  const [kitEditMode, setKitEditMode] = useState(false);
+  const projectFilesInputRef = useRef(null);
+  const kitLogoInputRef = useRef(null);
+  const kitFormRef = useRef(null);
+
+  const PROJECT_FILE_ACCEPT =
+    ".mp4,.webm,.mov,.ppt,.pptx,.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx";
+
+  const getProjectFileKind = (file) => {
+    const name = (file?.name || "").toLowerCase();
+    const type = file?.type || "";
+    if (type.startsWith("video/") || /\.(mp4|webm|mov)$/.test(name)) return "video";
+    if (/\.(ppt|pptx)$/.test(name)) return "ppt";
+    if (/\.pdf$/.test(name)) return "pdf";
+    if (type.startsWith("image/") || /\.(jpg|jpeg|png|gif)$/.test(name)) return "image";
+    return "file";
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes && bytes !== 0) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const isPdfKit = (item) =>
+    item?.kind === "pdf" || String(item?.file_name || "").toLowerCase().endsWith(".pdf");
+
+  const readBlobError = async (error, fallback) => {
+    const data = error?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await data.text());
+        if (parsed?.message) return parsed.message;
+      } catch (_parseError) {
+        return fallback;
+      }
+    }
+    return error?.response?.data?.message || fallback;
+  };
+
+  const fetchStampedPdf = async (item, forView) => {
+    if (!hasCookie("token")) return null;
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    const response = await axios.get(
+      `${Baseurl}/db/channel/digital-kit/${item.kit_id}/download${forView ? "?view=1" : ""}`,
+      {
+        headers: {
+          Authorization: "Bearer ".concat(token),
+          db: db_name,
+          m_id: 76,
+        },
+        responseType: "blob",
+      }
+    );
+    return new Blob([response.data], { type: "application/pdf" });
+  };
+
+  const showPdfPreview = (preview, blob, fileName) => {
+    const url = URL.createObjectURL(blob);
+    const title = String(fileName || "PDF").replace(/[<>&"]/g, "");
+    preview.document.open();
+    preview.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>html,body{margin:0;height:100%;background:#525659}iframe{border:0;width:100%;height:100%}</style></head><body><iframe src="${url}" title="${title}"></iframe></body></html>`
+    );
+    preview.document.close();
+  };
+
+  const openKitFile = async (item) => {
+    if (isPdfKit(item)) {
+      const preview = window.open("", "_blank");
+      if (!preview) {
+        toast.error("Allow pop-ups to view the PDF", { autoClose: 2500 });
+        return;
+      }
+      preview.document.write("<p style=\"font-family:sans-serif;padding:24px\">Opening PDF...</p>");
+      try {
+        const blob = await fetchStampedPdf(item, true);
+        if (!blob) {
+          preview.close();
+          return;
+        }
+        showPdfPreview(preview, blob, item.file_name);
+      } catch (error) {
+        preview.close();
+        toast.error(await readBlobError(error, "Could not open the file"), { autoClose: 2500 });
+      }
+      return;
+    }
+    if (!item.play_url) {
+      toast.error("File link is not available", { autoClose: 2000 });
+      return;
+    }
+    window.open(item.play_url, "_blank", "noopener,noreferrer");
+  };
+
+  const downloadKitFile = async (item) => {
+    if (!isPdfKit(item)) {
+      if (!item.download_url) {
+        toast.error("Download link is not available", { autoClose: 2000 });
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = item.download_url;
+      link.download = item.file_name || "download";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      return;
+    }
+    try {
+      const blob = await fetchStampedPdf(item);
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = item.file_name || "download.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(await readBlobError(error, "Could not download the file"), { autoClose: 2500 });
+    }
+  };
+
+  const resetProjectFilesModal = () => {
+    selectedProjectFiles.forEach((item) => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    });
+    setSelectedProjectFiles([]);
+    setFilesProjectId("");
+    setKitContactDetail("");
+    setKitReraNumber("");
+    setKitLogoFile(null);
+    setKitEditMode(false);
+    if (kitLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(kitLogoPreview);
+    setKitLogoPreview("");
+    if (projectFilesInputRef.current) projectFilesInputRef.current.value = "";
+    if (kitLogoInputRef.current) kitLogoInputRef.current.value = "";
+  };
+
+  const startEditKit = (projectId) => {
+    const details = kitDetailsForProject(projectId);
+    setFilesProjectId(String(projectId));
+    setKitContactDetail(details.contact || "");
+    setKitReraNumber(details.rera || "");
+    setKitLogoFile(null);
+    if (kitLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(kitLogoPreview);
+    setKitLogoPreview(details.logoUrl || "");
+    setKitEditMode(true);
+    if (kitLogoInputRef.current) kitLogoInputRef.current.value = "";
+    kitFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const kitDetailsForProject = (projectId) => {
+    const kits = digitalKits
+      .filter((kit) => String(kit.project_id) === String(projectId))
+      .sort((a, b) => Number(b.kit_id) - Number(a.kit_id));
+    return {
+      contact: kits.find((kit) => kit.contact_detail)?.contact_detail || "",
+      rera: kits.find((kit) => kit.rera_number)?.rera_number || "",
+      logoUrl: kits.find((kit) => kit.logo_url)?.logo_url || "",
+    };
+  };
+
+  const resizeLogoFile = async (file) => {
+    const toPngFile = (canvas) => new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve(file);
+          return;
+        }
+        const name = String(file.name || "logo").replace(/\.\w+$/, "") + ".png";
+        resolve(new File([blob], name, { type: "image/png" }));
+      }, "image/png");
+    });
+
+    try {
+      if (typeof createImageBitmap === "function") {
+        const bitmap = await createImageBitmap(file);
+        const max = 320;
+        const scale = Math.min(1, max / Math.max(bitmap.width || 1, bitmap.height || 1));
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          bitmap.close();
+          return file;
+        }
+        ctx.drawImage(bitmap, 0, 0, width, height);
+        bitmap.close();
+        return toPngFile(canvas);
+      }
+    } catch (_error) {
+      return file;
+    }
+    return file;
+  };
+
+  const handleKitLogoPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const name = (file.name || "").toLowerCase();
+    if (!/\.(jpg|jpeg|png)$/.test(name)) {
+      toast.error("Property logo must be a jpg or png image", { autoClose: 2500 });
+      return;
+    }
+    const resized = await resizeLogoFile(file);
+    if (kitLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(kitLogoPreview);
+    setKitLogoFile(resized);
+    setKitLogoPreview(URL.createObjectURL(resized));
+  };
+
+  const openDigitalKitTab = () => {
+    setActiveTab("digitalKit");
+    if (!filesProjectId && projects?.[0]?.project_id) {
+      setFilesProjectId(String(projects[0].project_id));
+    }
+    getDigitalKits();
+  };
+
+  const authHeader = () => {
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    return {
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer ".concat(token),
+        db: db_name,
+        m_id: 76,
+      },
+    };
+  };
+
+  const getDigitalKits = async () => {
+    if (!hasCookie("token")) return;
+    try {
+      const response = await axios.get(`${Baseurl}/db/channel/digital-kit`, authHeader());
+      setDigitalKits(response?.data?.data || []);
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        toast.error(error.response.data.message, { autoClose: 2500 });
+      }
+    }
+  };
+
+  const handleProjectFilesPick = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const accepted = [];
+    files.forEach((file) => {
+      if (file.size > MAX_KIT_FILE_BYTES) {
+        toast.error(`${file.name} is larger than 500MB`, { autoClose: 3000 });
+        return;
+      }
+      accepted.push(file);
+    });
+    const next = accepted.map((file, index) => ({
+      id: `${Date.now()}-${index}-${file.name}`,
+      file,
+      name: file.name,
+      size: file.size,
+      kind: getProjectFileKind(file),
+      previewUrl: file.type.startsWith("video/") || file.type.startsWith("image/")
+        ? URL.createObjectURL(file)
+        : null,
+    }));
+    setSelectedProjectFiles((prev) => [...prev, ...next]);
+    e.target.value = "";
+  };
+
+  const removeSelectedProjectFile = (id) => {
+    setSelectedProjectFiles((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((item) => item.id !== id);
+    });
+  };
+
+  const handleSaveProjectFiles = async () => {
+    if (!filesProjectId) {
+      return toast.warning("Please select a project", { autoClose: 2500 });
+    }
+    if (!selectedProjectFiles.length && !kitEditMode) {
+      return toast.warning("Please select at least one file", { autoClose: 2500 });
+    }
+    if (!hasCookie("token")) return;
+
+    dispatch(startButtonLoading());
+    try {
+      if (!selectedProjectFiles.length && kitEditMode) {
+        const formData = new FormData();
+        formData.append("project_id", filesProjectId);
+        formData.append("contact_detail", kitContactDetail.trim());
+        formData.append("rera_number", kitReraNumber.trim());
+        if (kitLogoFile) formData.append("logo", kitLogoFile);
+        await axios.put(`${Baseurl}/db/channel/digital-kit/details`, formData, {
+          ...authHeader(),
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        });
+        toast.success("Contact and logo updated", { autoClose: 2500 });
+        resetProjectFilesModal();
+        await getDigitalKits();
+        return;
+      }
+      for (let index = 0; index < selectedProjectFiles.length; index += 1) {
+        const item = selectedProjectFiles[index];
+        const formData = new FormData();
+        formData.append("file", item.file);
+        formData.append("project_id", filesProjectId);
+        formData.append("kit_type", "repository");
+        formData.append("contact_detail", kitContactDetail.trim());
+        formData.append("rera_number", kitReraNumber.trim());
+        if (index === 0 && kitLogoFile) formData.append("logo", kitLogoFile);
+        await axios.post(`${Baseurl}/db/channel/digital-kit/file`, formData, {
+          ...authHeader(),
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        });
+      }
+      toast.success("Uploaded successfully", { autoClose: 2500 });
+      selectedProjectFiles.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+      setSelectedProjectFiles([]);
+      setKitContactDetail("");
+      setKitReraNumber("");
+      setKitLogoFile(null);
+      setKitEditMode(false);
+      if (kitLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(kitLogoPreview);
+      setKitLogoPreview("");
+      if (projectFilesInputRef.current) projectFilesInputRef.current.value = "";
+      if (kitLogoInputRef.current) kitLogoInputRef.current.value = "";
+      await getDigitalKits();
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.message || "Upload failed";
+      toast.error(message, { autoClose: 3500 });
+    } finally {
+      dispatch(stopButtonLoading());
+    }
+  };
 
 
   const getDataList = async () => {
-    setLoader(true);
+    if (!projects.length) setLoader(true);
     if (hasCookie("token")) {
       let token = getCookie("token");
       let db_name = getCookie("db_name");
@@ -64,6 +422,7 @@ const CampaignAdminScreen = () => {
         if (response?.status === 200 || response?.status === 201) {
           setLoader(false)
           setProjects(response?.data?.data)
+          getDigitalKits()
         }
       } catch (error) {
         if (error?.response?.data?.message) {
@@ -382,24 +741,55 @@ const CampaignAdminScreen = () => {
           :
           (
             <div className="ps-4 pe-4 pb-4 w-100 mt-4 overflow-auto">
-              <div className="top_btn_sec mb-4" >
-                <div className="d-flex ">
-                  {
-                    hasCookie("channel") && userInfo?.role_id == null && (
-                      <button
-                        className="btn ms-auto  Add_btn "
-                        style={{ background: `${clientBtnColor}` }}
-                        onClick={() => {
-                          setShowModal(true);
-                        }}
-                      >
-                        <PlusIcon />
-                        Create Campaign
-                      </button>
-                    )
-                  }
-
+              <div className="d-flex align-items-center justify-content-between mb-3" style={{ borderBottom: "1px solid #E6E6E6" }}>
+                <div className="d-flex">
+                  {false && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("campaign")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      borderBottom: activeTab === "campaign" ? `2px solid ${clientBtnColor}` : "2px solid transparent",
+                      color: activeTab === "campaign" ? clientBtnColor : "#6B6B6B",
+                      fontWeight: 600,
+                      fontSize: 15,
+                      padding: "10px 16px",
+                      marginBottom: -1,
+                    }}
+                  >
+                    Campaign
+                  </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={openDigitalKitTab}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      borderBottom: activeTab === "digitalKit" ? `2px solid ${clientBtnColor}` : "2px solid transparent",
+                      color: activeTab === "digitalKit" ? clientBtnColor : "#6B6B6B",
+                      fontWeight: 600,
+                      fontSize: 15,
+                      padding: "10px 16px",
+                      marginBottom: -1,
+                    }}
+                  >
+                    Digital Kit
+                  </button>
                 </div>
+                {activeTab === "campaign" && hasCookie("channel") && userInfo?.role_id == null && (
+                  <button
+                    className="btn Add_btn mb-2"
+                    style={{ background: `${clientBtnColor}` }}
+                    onClick={() => {
+                      setShowModal(true);
+                    }}
+                  >
+                    <PlusIcon />
+                    Create Campaign
+                  </button>
+                )}
               </div>
               <ConfirmBox
                 showConfirm={deleteshowConfirm}
@@ -407,6 +797,8 @@ const CampaignAdminScreen = () => {
                 actionType={deleteHandler}
                 title={"Are You Sure you want to Delete ?"}
               />
+
+              {activeTab === "campaign" && (
               <section className="Channel-profile Booking-Detail Visit-Details Campaigns pt-4 pb-2 bg-white">
                 <div className="container mb-4">
                   <div className="row gx-4 gy-4">
@@ -471,6 +863,305 @@ const CampaignAdminScreen = () => {
                   </div>
                 </div>
               </section>
+              )}
+
+              {activeTab === "digitalKit" && (
+                <section className="pt-3 pb-4 bg-white">
+                  <div className="px-3" style={{ paddingTop: 8, paddingBottom: 12 }}>
+                    <div className="row g-3 align-items-start">
+                      <div className="col-12">
+                        <div ref={kitFormRef} className="w-100 d-flex flex-column border rounded-3 p-3" style={{ boxShadow: "0 1px 4px rgba(38, 32, 59, 0.06)" }}>
+                          <div className="fw-semibold mb-2" style={{ fontSize: 16 }}>
+                            {kitEditMode ? "Edit Digital Kit" : "Digital Kit"}
+                          </div>
+                          <div className="d-flex align-items-end flex-nowrap gap-2">
+                            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                              <label className="mb-1 d-block" style={{ color: "#9C9AA5", fontSize: 12 }}>
+                                Select Project*
+                              </label>
+                              <select
+                                className="form-select"
+                                style={{ outline: "none", height: 36, fontSize: 13 }}
+                                value={filesProjectId}
+                                onChange={(e) => setFilesProjectId(e.target.value)}
+                              >
+                                <option value="">Choose project</option>
+                                {projects?.map((project) => (
+                                  <option key={project?.project_id} value={project?.project_id}>
+                                    {project?.project}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                              <label className="mb-1 d-block" style={{ color: "#9C9AA5", fontSize: 12 }}>
+                                Phone number
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Phone number"
+                                value={kitContactDetail}
+                                onChange={(e) => setKitContactDetail(e.target.value)}
+                                style={{ height: 36, fontSize: 13 }}
+                              />
+                            </div>
+                            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                              <label className="mb-1 d-block" style={{ color: "#9C9AA5", fontSize: 12 }}>
+                                RERA number
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="RERA number"
+                                value={kitReraNumber}
+                                onChange={(e) => setKitReraNumber(e.target.value)}
+                                style={{ height: 36, fontSize: 13 }}
+                              />
+                            </div>
+                            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                              <label className="mb-1 d-block" style={{ color: "#9C9AA5", fontSize: 12 }}>
+                                Property logo
+                              </label>
+                              <input
+                                ref={kitLogoInputRef}
+                                type="file"
+                                accept=".jpg,.jpeg,.png"
+                                onChange={handleKitLogoPick}
+                                id="kitLogoInput"
+                                style={{ display: "none" }}
+                              />
+                              <label
+                                htmlFor="kitLogoInput"
+                                className="border rounded d-flex align-items-center gap-2 mb-0 px-2"
+                                style={{
+                                  cursor: "pointer",
+                                  color: clientBtnColor,
+                                  height: 36,
+                                  background: "#FAFAFA",
+                                  fontSize: 13,
+                                }}
+                              >
+                                {kitLogoPreview ? (
+                                  <span style={{ width: 22, height: 22, overflow: "hidden", flexShrink: 0, display: "inline-flex" }}>
+                                    <img
+                                      src={kitLogoPreview}
+                                      alt="Property logo"
+                                      style={{ width: 22, height: 22, objectFit: "contain", display: "block" }}
+                                    />
+                                  </span>
+                                ) : null}
+                                <span className="text-truncate">{kitLogoFile ? kitLogoFile.name : "jpg or png logo"}</span>
+                              </label>
+                            </div>
+                            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                              <label className="mb-1 d-block" style={{ color: "#9C9AA5", fontSize: 12 }}>
+                                Files
+                              </label>
+                              <input
+                                ref={projectFilesInputRef}
+                                type="file"
+                                multiple
+                                accept={PROJECT_FILE_ACCEPT}
+                                onChange={handleProjectFilesPick}
+                                id="projectFilesInput"
+                                style={{ display: "none" }}
+                              />
+                              <label
+                                htmlFor="projectFilesInput"
+                                className="border rounded d-flex align-items-center mb-0 px-2"
+                                title="mp4, webm, mov, ppt, pdf, jpg, png, doc, xlsx"
+                                style={{
+                                  cursor: "pointer",
+                                  color: clientBtnColor,
+                                  height: 36,
+                                  background: "#FAFAFA",
+                                  fontSize: 13,
+                                }}
+                              >
+                                <span className="text-truncate">Video, PPT, PDF or image</span>
+                              </label>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn flex-shrink-0"
+                              style={{ color: "#9C9AA5", border: "1px solid #D9D9D9", background: "#fff", height: 36, fontSize: 12, padding: "4px 12px", borderRadius: 6 }}
+                              onClick={resetProjectFilesModal}
+                            >
+                              Clear
+                            </button>
+                            <button
+                              type="button"
+                              className="btn text-white flex-shrink-0"
+                              style={{ background: clientBtnColor, height: 36, fontSize: 12, padding: "4px 12px", borderRadius: 6 }}
+                              onClick={handleSaveProjectFiles}
+                            >
+                              {kitEditMode ? "Update" : "Save"}
+                            </button>
+                          </div>
+
+                            {selectedProjectFiles.length > 0 && (
+                              <div className="d-flex flex-column gap-2" style={{ maxHeight: 180, overflowY: "auto" }}>
+                                {selectedProjectFiles.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="d-flex align-items-center justify-content-between border rounded px-2 py-2 gap-2"
+                                  >
+                                    <div className="d-flex align-items-center gap-2 overflow-hidden">
+                                      {item.kind === "image" && item.previewUrl ? (
+                                        <img
+                                          src={item.previewUrl}
+                                          alt={item.name}
+                                          style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4, flexShrink: 0 }}
+                                        />
+                                      ) : (
+                                        <span
+                                          className="text-uppercase small fw-semibold px-2 py-1 rounded"
+                                          style={{
+                                            background: "#F1F2F6",
+                                            color: clientBtnColor,
+                                            minWidth: 48,
+                                            textAlign: "center",
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          {item.kind}
+                                        </span>
+                                      )}
+                                      <div className="overflow-hidden">
+                                        <div className="text-truncate" title={item.name}>{item.name}</div>
+                                        <small className="text-muted">{formatFileSize(item.size)}</small>
+                                      </div>
+                                    </div>
+                                    <Delete
+                                      style={{ color: "#eb5244", cursor: "pointer", flexShrink: 0 }}
+                                      onClick={() => removeSelectedProjectFile(item.id)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+                      </div>
+
+                      <div className="col-12">
+                        <div className="w-100 d-flex flex-column border rounded-3 p-3" style={{ boxShadow: "0 1px 4px rgba(38, 32, 59, 0.06)" }}>
+                          <div className="fw-semibold mb-3" style={{ fontSize: 16 }}>Uploaded kits</div>
+                          <div className="d-flex flex-column gap-3">
+                            {!digitalKits.length && (
+                              <small className="text-muted">No digital kits uploaded yet.</small>
+                            )}
+                            {projects
+                              .filter((project) => digitalKits.some((kit) => String(kit.project_id) === String(project.project_id)))
+                              .map((project) => (
+                              <div key={project?.project_id} className="border rounded-3 p-3">
+                                {(() => {
+                                  const details = kitDetailsForProject(project?.project_id);
+                                  return (
+                                    <div className="d-flex align-items-center gap-3 mb-3">
+                                      {details.logoUrl ? (
+                                        <span style={{ width: 48, height: 48, overflow: "hidden", flexShrink: 0, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", padding: 4 }}>
+                                          <img
+                                            src={details.logoUrl}
+                                            alt="Property logo"
+                                            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                                          />
+                                        </span>
+                                      ) : (
+                                        <div
+                                          className="d-flex align-items-center justify-content-center text-muted"
+                                          style={{ width: 48, height: 48, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", fontSize: 10, textAlign: "center", flexShrink: 0, lineHeight: 1.1 }}
+                                        >
+                                          No logo
+                                        </div>
+                                      )}
+                                      <div className="overflow-hidden flex-grow-1">
+                                        <div className="fw-semibold text-truncate" style={{ fontSize: 14 }}>{project?.project}</div>
+                                        <div className="text-muted text-truncate" style={{ fontSize: 12 }}>{details.contact ? `Phone number ${details.contact}` : "No phone number"}</div>
+                                        <div className="text-muted text-truncate" style={{ fontSize: 12 }}>{details.rera ? `RERA number ${details.rera}` : "No RERA number"}</div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn flex-shrink-0"
+                                        style={{
+                                          color: clientBtnColor,
+                                          border: `1px solid ${clientBtnColor}`,
+                                          background: "transparent",
+                                          height: 28,
+                                          fontSize: 12,
+                                          padding: "2px 10px",
+                                          borderRadius: 6,
+                                        }}
+                                        onClick={() => startEditKit(project?.project_id)}
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                  );
+                                })()}
+                                <div className="d-flex flex-column gap-1">
+                                  {digitalKits
+                                    .filter((kit) => String(kit.project_id) === String(project.project_id))
+                                    .sort((a, b) => Number(b.kit_id) - Number(a.kit_id))
+                                    .slice(0, 2)
+                                    .map((item) => (
+                                          <div
+                                            key={item.kit_id}
+                                            className="d-flex align-items-center justify-content-between rounded px-3 py-2 gap-2"
+                                            style={{ background: "#F7F8FA" }}
+                                          >
+                                            <div className="d-flex align-items-center gap-2 overflow-hidden">
+                                              <span
+                                                className="text-uppercase small fw-semibold px-2 py-1 rounded"
+                                                style={{
+                                                  background: "#F1F2F6",
+                                                  color: clientBtnColor,
+                                                  minWidth: 48,
+                                                  textAlign: "center",
+                                                  flexShrink: 0,
+                                                }}
+                                              >
+                                                {item.kind}
+                                              </span>
+                                              <div className="overflow-hidden">
+                                                <div className="text-truncate" title={item.file_name}>{item.file_name}</div>
+                                                <small className="text-muted">{formatFileSize(Number(item.file_size || 0))}</small>
+                                              </div>
+                                            </div>
+                                            <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                                              <button
+                                                type="button"
+                                                className="btn kit-action-btn"
+                                                style={{
+                                                  color: clientBtnColor,
+                                                  border: `1px solid ${clientBtnColor}`,
+                                                  background: "transparent",
+                                                }}
+                                                onClick={() => openKitFile(item)}
+                                              >
+                                                {item.kind === "video" ? "Play" : "View"}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="btn kit-action-btn text-white"
+                                                style={{ background: clientBtnColor }}
+                                                onClick={() => downloadKitFile(item)}
+                                              >
+                                                Download
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
             </div>
           )
       }

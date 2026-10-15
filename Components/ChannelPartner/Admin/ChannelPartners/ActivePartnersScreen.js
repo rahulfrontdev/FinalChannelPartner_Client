@@ -10,7 +10,7 @@ import Modal from "react-bootstrap/Modal";
 import { Button } from 'react-bootstrap';
 import dynamic from 'next/dynamic'
 import Papa from "papaparse";
-import { Baseurl, isRmRole, isBstRole } from '../../../../Utils/Constants';
+import { Baseurl, isRmRole, isBstRole, isSelfDeletedCpLead } from '../../../../Utils/Constants';
 import ConfirmBox from '../../../Basics/ConfirmBox';
 import { useRouter } from 'next/router';
 import Select from 'react-select';
@@ -166,7 +166,7 @@ const ActivePartnersScreen = () => {
                     );
                     if (response?.status === 200 || response?.status === 201) {
                         setLoader(false)
-                        setDataList(response?.data?.data?.leads || []);
+                        setDataList((response?.data?.data?.leads || []).filter((lead) => !isSelfDeletedCpLead(lead)));
                     }
                     return;
                 }

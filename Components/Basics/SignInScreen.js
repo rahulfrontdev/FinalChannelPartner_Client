@@ -7,7 +7,7 @@ import { setCookie } from "cookies-next";
 import { useSelector, useDispatch } from "react-redux";
 import { userMode } from "../../store/dbModeSlice";
 import { UserLogIN } from "../../store/ClientLoginSlice";
-import { Baseurl, filesUrl } from "../../Utils/Constants";
+import { Baseurl, ClientUrl, filesUrl } from "../../Utils/Constants";
 import axios from "axios";
 import { validEmail } from "../../Utils/regex";
 import {
@@ -89,21 +89,19 @@ export default function SignInScreen({ setLoggedIn }) {
       try {
         let baseUrl = window.location.origin;
         // Handle local development URLs (localhost and local IP addresses)
-        let payload = {};
-        if (baseUrl === "http://localhost:3000" || baseUrl === "http://192.168.1.36:3000" || baseUrl.startsWith("http://10.") || baseUrl.startsWith("http://192.168.") || baseUrl.startsWith("http://172.")) {
-          payload = {
-            email: userForm.email.toLowerCase(),
-            password: userForm.password,
-            type: type,
-          }
-        } else {
-          payload = {
-            email: userForm.email.toLowerCase(),
-            password: userForm.password,
-            type: type,
-            client_url: baseUrl
-          }
-        }
+        const isLocalDev =
+          baseUrl === "http://localhost:3000" ||
+          baseUrl === "http://192.168.1.36:3000" ||
+          baseUrl.startsWith("http://10.") ||
+          baseUrl.startsWith("http://192.168.") ||
+          baseUrl.startsWith("http://172.");
+
+        const payload = {
+          email: userForm.email.toLowerCase(),
+          password: userForm.password,
+          type: type,
+          client_url: isLocalDev ? ClientUrl : baseUrl,
+        };
         const res = await axios.post(Baseurl + "/db/login", payload);
 
         if (res.status === 200) {
@@ -182,7 +180,7 @@ export default function SignInScreen({ setLoggedIn }) {
         let baseUrl = window.location.origin;
         // Handle local development URLs (localhost and local IP addresses)
         if (baseUrl === "http://localhost:3000" || baseUrl.startsWith("http://10.") || baseUrl.startsWith("http://192.168.") || baseUrl.startsWith("http://172.")) {
-          baseUrl = "https://srijanbandhan.com";
+          baseUrl = ClientUrl;
         }
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
