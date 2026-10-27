@@ -55,7 +55,7 @@ const BookingsScreen = () => {
    const clientBtnColor=hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#293790"
    const[loader,setLoader]=useState(false)
 
-   let statusArray=[{id:"",label:"All"},{id:"Payment Initiated",label:"Payment Initiated"},{id:"Payment Received",label:"Payment Received"},{id:"Payment Rejected",label:"Payment Rejected"},{id:"Booking Done",label:"Booking Done"},{id:"Eligible for brokerage bill",label:"Eligible for brokerage bill"},{id:"Bill Received",label:"Bill Received"},{id:"Bill sent",label:"Bill sent"}]
+   let statusArray=[{id:"",label:"All"},{id:"Payment Initiated",label:"Payment Initiated"},{id:"Payment Received",label:"Payment Received"},{id:"Payment Rejected",label:"Payment Rejected"},{id:"Booking Done",label:"Booking Done"},{id:"Eligible for brokerage bill",label:"Eligible for brokerage bill"},{id:"Agreement Verified",label:"Agreement Verified"},{id:"Bill Received",label:"Bill Received"},{id:"Bill sent",label:"Bill sent"}]
 
      const userInfo=hasCookie("userInfo") ? JSON.parse(getCookie("userInfo")):null
      

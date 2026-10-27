@@ -19,7 +19,10 @@ import { fetchData } from '../../../../Utils/getReq';
 import * as XLSX from "xlsx";
 import { formatDate } from '../../../../Utils/common';
 
-
+const canCreateBrokerageBill = (status) =>
+  status === "Eligible for brokerage bill" ||
+  status === "Payment Rejected" ||
+  status === "Agreement Verified";
 
 const ManageUsersTable = ({start, end, deleteConfirm, disableConfirm, dataList, openEdtMdl, title, setShowAssignTo, oldAssignTo, setoldAssignTo, setShowDateFilter, getDataList,loader,cpId,setCpId,statusId,setStatusId }) => {
   const router = useRouter()
@@ -223,7 +226,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
           return (
             <div
               style={{ 
-                background:value==="Payment Initiated" ? "#FFA825" : value==="Payment Received" ?"#84CA4D" : value==="Booking Done" ? "#17B4E7" : value==="Eligible for brokerage bill" ? "#186EBC" : value==="Bill Received" ? "#FCCC37" : value==="VISIT DONE NOT BOOKED" ? "#d43953" :"violet"
+                background:value==="Payment Initiated" ? "#FFA825" : value==="Payment Received" ?"#84CA4D" : value==="Booking Done" ? "#17B4E7" : value==="Eligible for brokerage bill" ? "#186EBC" : value==="Agreement Verified" ? "#0D9488" : value==="Bill Received" ? "#FCCC37" : value==="VISIT DONE NOT BOOKED" ? "#d43953" :"violet"
                 , color: "white", padding: "6px", borderRadius: "20px", border: "white", width: "fit-content"}}
               className='pe-3 ps-3'>
               {value}
@@ -257,7 +260,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
                 }}
                 style={{
                   // background:value?.length === 0 && tableMeta?.rowData[7] == "Eligible for brokerage bill" ? clientBtnColor :"#9C9AA5",
-                  background:tableMeta?.rowData[7] == "Eligible for brokerage bill" || tableMeta?.rowData[7] == "Payment Rejected" ? clientBtnColor :"#9C9AA5",
+                  background:canCreateBrokerageBill(tableMeta?.rowData[7]) ? clientBtnColor :"#9C9AA5",
                   color: "white",
                   padding: "6px",
                   borderRadius: "20px",
@@ -265,7 +268,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
                   cursor: "pointer",
                 }}
                 // disabled={value?.length == 0 && tableMeta?.rowData[7] == "Eligible for brokerage bill" ? false:true }
-                disabled={ tableMeta?.rowData[7] == "Eligible for brokerage bill" || tableMeta?.rowData[7] == "Payment Rejected" ? false:true }
+                disabled={ !canCreateBrokerageBill(tableMeta?.rowData[7]) }
                 className="pe-3 ps-3 "
               >
                 + Create
@@ -277,7 +280,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
     },
   ];
 
-  let statusArray=[{id:"",label:"All"},{id:"Payment Initiated",label:"Payment Initiated"},{id:"Payment Received",label:"Payment Received"},{id:"Payment Rejected",label:"Payment Rejected"},{id:"Booking Done",label:"Booking Done"},{id:"Eligible for brokerage bill",label:"Eligible for brokerage bill"},{id:"Bill Received",label:"Bill Received"},{id:"Bill sent",label:"Bill sent"}]
+  let statusArray=[{id:"",label:"All"},{id:"Payment Initiated",label:"Payment Initiated"},{id:"Payment Received",label:"Payment Received"},{id:"Payment Rejected",label:"Payment Rejected"},{id:"Booking Done",label:"Booking Done"},{id:"Eligible for brokerage bill",label:"Eligible for brokerage bill"},{id:"Agreement Verified",label:"Agreement Verified"},{id:"Bill Received",label:"Bill Received"},{id:"Bill sent",label:"Bill sent"}]
 
 
   const CustomToolbar = () => {
@@ -646,7 +649,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
                         <div className="pt-3">
                           <form id="survey-form" onSubmit={(e)=>{
                             e.preventDefault();
-                            dataList?.find((item)=>item?.booking_id==brokerageBill?.booking_id)?.status=="Eligible for brokerage bill" && createBrokerageBill()
+                            (dataList?.find((item)=>item?.booking_id==brokerageBill?.booking_id)?.status=="Eligible for brokerage bill" || dataList?.find((item)=>item?.booking_id==brokerageBill?.booking_id)?.status=="Agreement Verified") && createBrokerageBill()
                             dataList?.find((item)=>item?.booking_id==brokerageBill?.booking_id)?.status=="Payment Rejected" && updateBrokerageBill()
                           }}>
                             <div className="d-lg-flex justify-content-lg-around">
