@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from "next/link";
 import { hasCookie, getCookie, setCookie } from "cookies-next";
 import { toast } from "react-toastify";
@@ -39,6 +39,7 @@ import { MenuItem } from '@mui/material';
 import { VisitReport } from './visitReport';
 import { OpenReport } from './OpenReport';
 import { BookingReport } from './BookingReport';
+import RmDashboard from '../../User/DashboardUser/RmDashboard';
 
 
 const DashboardAdmin = () => {
@@ -78,17 +79,37 @@ const DashboardAdmin = () => {
     }
 
     const [screen, setScreen] = React.useState('1');
+    const dashboardLoaded = useRef(false);
+    const rangeKey = useRef("");
 
+    const toDayString = (input) => {
+      if (!input) return "";
+      if (typeof input === "string") {
+        const match = input.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+      }
+      const date = input instanceof Date ? input : new Date(input);
+      if (Number.isNaN(date.getTime())) return "";
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${date.getFullYear()}-${month}-${day}`;
+    };
+
+    const toLocalNoon = (day) => {
+      const [year, month, date] = day.split("-").map(Number);
+      return new Date(year, month - 1, date, 12, 0, 0, 0);
+    };
 
     const handleValueChange = (newValue) => {
-      setValue(newValue);
-      setStartDate(startDate)
-      setEndDate(endDate)
-      if(screen == 1){
-        getDataList(newValue.startDate, newValue.endDate);
-
-      }
-  
+      const nextStart = toDayString(newValue?.startDate);
+      const nextEnd = toDayString(newValue?.endDate);
+      if (!nextStart || !nextEnd) return;
+      const key = `${nextStart}|${nextEnd}`;
+      if (rangeKey.current === key) return;
+      rangeKey.current = key;
+      setValue({ startDate: toLocalNoon(nextStart), endDate: toLocalNoon(nextEnd) });
+      setStartDate(nextStart);
+      setEndDate(nextEnd);
     }
 
 
@@ -109,11 +130,11 @@ const DashboardAdmin = () => {
         let formattedStartOfWeek = startOfWeek.toISOString().substr(0, 10);
         let formattedEndOfWeek = endOfWeek.toISOString().substr(0, 10);
         settimeFilter('weekly')
+        rangeKey.current = `${formattedStartOfWeek}|${formattedEndOfWeek}`;
         setValue({
-          ...value,
-          startDate: formattedStartOfWeek,
-          endDate: formattedEndOfWeek,
-        })  
+          startDate: toLocalNoon(formattedStartOfWeek),
+          endDate: toLocalNoon(formattedEndOfWeek),
+        })
         setEndDate(formattedEndOfWeek)
         setStartDate(formattedStartOfWeek)
 
@@ -264,7 +285,8 @@ const DashboardAdmin = () => {
     }
 
     const getDataList = async (start, end, type) => {
-        setLoader(true)
+        if (!start || !end) return;
+        if (!dashboardLoaded.current) setLoader(true)
         if (hasCookie("token")) {
             let token = getCookie("token");
             let db_name = getCookie("db_name");
@@ -277,16 +299,19 @@ const DashboardAdmin = () => {
                 },
             };
             try {
-                const response = await axios.get(Baseurl + `/db/channel/dashboard/admin?endDate=${end}&&startDate=${start}`, header);
+                const response = await axios.get(Baseurl + `/db/channel/dashboard/admin?endDate=${end}&startDate=${start}`, header);
                 if(response?.status === 200 || response?.status === 201){
-                    setLoader(false)
                     setDataList(response.data.data);
                 }
             } catch (error) {
-                setLoader(false)
                 console.log(error);
                 toast.error("Something went wrong!",{autoClose:2500});
+            } finally {
+                dashboardLoaded.current = true;
+                setLoader(false)
             }
+        } else {
+            setLoader(false)
         }
     };
     useEffect(() => {
@@ -301,7 +326,7 @@ const DashboardAdmin = () => {
         if (startDate !== null && endDate !== null && screen == 1) {
             getDataList(startDate, endDate);
         }
-    }, [router.isReady, id, startDate, screen]);
+    }, [router.isReady, id, startDate, endDate, screen]);
 
     // useEffect(() => {
     //     const location = window.navigator && window.navigator.geolocation
@@ -383,7 +408,7 @@ const DashboardAdmin = () => {
                        </FormControl>
                         </div>
                     </div>
-                    {screen === 2 ?<VisitReport startDate={value?.startDate} endDate={value?.endDate} dateFilter={value?.dateFilter} /> : screen === 3 ? <BookingReport startDate={value?.startDate} endDate={value?.endDate}/>  : screen === 4 ? <OpenReport startDate={value?.startDate} endDate={value?.endDate}/>
+                    {screen == 2 ?<VisitReport startDate={value?.startDate} endDate={value?.endDate} dateFilter={value?.dateFilter} /> : screen == 3 ? <BookingReport startDate={value?.startDate} endDate={value?.endDate}/>  : screen == 4 ? <OpenReport startDate={value?.startDate} endDate={value?.endDate}/>
                  
                    :
                    <div className="cards_Box ">
@@ -596,6 +621,11 @@ const DashboardAdmin = () => {
                             </Link>
                             </div>
                         </div>
+                        <RmDashboard
+                          rm={dataList?.rm_dashboard}
+                          startDate={value?.startDate}
+                          endDate={value?.endDate}
+                        />
                         <div className='row'>
                         {dataList?.EnrolVsAcceptChart?.length ?
                         <div className="col-xl-6 col-md-12 col-lg-6 col-sm-12 mt-2"> 

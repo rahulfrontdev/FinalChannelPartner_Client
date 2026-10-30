@@ -19,6 +19,13 @@ const ManageUsersTable = ({ deleteConfirm, disableConfirm, dataList, openEdtMdl,
             }
         },
         {
+            name: 'user_l_name',
+            label: "Last Name",
+            options: {
+                filter: true,
+            }
+        },
+        {
             name: 'email',
             label: "E-mail",
             options: {
@@ -113,7 +120,7 @@ const ManageUsersTable = ({ deleteConfirm, disableConfirm, dataList, openEdtMdl,
                                     <EditIcon />
                                 </button>
                             </Link>
-                            {tableMeta.rowData[6] ?
+                            {tableMeta.rowData[7] ?
                                 <button
                                     onClick={() => disableConfirm(value, 0)}
                                     className="action_btn"

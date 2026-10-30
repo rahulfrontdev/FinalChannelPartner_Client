@@ -66,6 +66,7 @@ const VisitTable = ({ rows = [], emptyText }) => {
   if (!rows.length) {
     return <div className="text-muted px-3 pb-3">{emptyText}</div>;
   }
+  const showRm = rows.some((row) => row.rm_name);
   return (
     <div className="table-responsive bg-white rounded border mx-3 mb-3">
       <table className="table align-middle mb-0">
@@ -74,6 +75,7 @@ const VisitTable = ({ rows = [], emptyText }) => {
             <th>CP Name</th>
             <th>Project</th>
             <th>Visit Type</th>
+            {showRm ? <th>RM</th> : null}
             <th>Schedule</th>
             <th></th>
           </tr>
@@ -84,6 +86,7 @@ const VisitTable = ({ rows = [], emptyText }) => {
               <td className="fw-semibold">{row.cp_name || "---------"}</td>
               <td>{row.project_name || "---------"}</td>
               <td>{row.visit_type || "---------"}</td>
+              {showRm ? <td>{row.rm_name || "---------"}</td> : null}
               <td>{formatSchedule(row.schedule_visit_at)}</td>
               <td className="text-end">
                 {row.cpl_id ? (
@@ -121,6 +124,7 @@ const RmDashboard = ({ rm = {}, startDate, endDate }) => {
   const projects = Array.isArray(cps.by_project) ? cps.by_project : [];
   const upcoming = Array.isArray(rm?.upcoming_visits) ? rm.upcoming_visits : [];
   const completed = Array.isArray(rm?.recent_completed_visits) ? rm.recent_completed_visits : [];
+  const byRm = Array.isArray(rm?.by_rm) ? rm.by_rm : [];
   const typeIcons = {
     "Site Visit": PlaceIcon,
     "Video Visit": VideocamIcon,
@@ -317,6 +321,62 @@ const RmDashboard = ({ rm = {}, startDate, endDate }) => {
 
       <SectionTitle>Recent Completed Visits</SectionTitle>
       <VisitTable rows={completed} emptyText="No completed visits" />
+
+      {byRm.length ? (
+        <>
+          <SectionTitle>By RM</SectionTitle>
+          {byRm.map((rmUser) => {
+            const rmProjects = Array.isArray(rmUser?.cps?.by_project) ? rmUser.cps.by_project : [];
+            const rmVisits = rmUser?.visits || {};
+            const rmTypes = rmVisits.by_type || {};
+            return (
+              <div key={rmUser.user_id || rmUser.user_code} className="border rounded bg-white mx-3 mb-4 p-3">
+                <div className="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                  <div>
+                    <div className="fw-bold" style={{ color: "#160354", fontSize: "18px" }}>{rmUser.name || "---------"}</div>
+                    <div className="text-muted">{rmUser.email || "---------"}</div>
+                  </div>
+                  <span className="fw-semibold" style={{ color: "#03850d" }}>{rmUser.status || "---------"}</span>
+                </div>
+                <div className="row leads_row addgap">
+                  <StatCard head="Total CPs" price={rmUser?.cps?.total} dateLabel={dateLabel} color="#05539c" icon={Diversity3Icon} />
+                  <StatCard head="Active CPs" price={rmUser?.cps?.active} dateLabel={dateLabel} color="#03850d" icon={GroupAddIcon} />
+                  <StatCard head="New CPs" price={rmUser?.cps?.new_in_range} dateLabel={dateLabel} color="#0000FF" icon={PersonAddAlt1Icon} />
+                  <StatCard head="Total Visits" price={rmVisits.total} dateLabel={dateLabel} color="#293790" icon={WhereToVoteIcon} />
+                  <StatCard head="Scheduled Visit" price={rmVisits.scheduled} dateLabel={dateLabel} color="#17B4E7" icon={EventAvailableIcon} />
+                  <StatCard head="Completed" price={rmVisits.completed} dateLabel={dateLabel} color="#198754" icon={TaskAltIcon} />
+                  <StatCard head="Not Completed" price={rmVisits.not_completed} dateLabel={dateLabel} color="#fd7e14" icon={PendingActionsIcon} />
+                  <StatCard head="Due Today" price={rmVisits.due_today} dateLabel={dateLabel} color="#9c0550" icon={TodayIcon} />
+                  <StatCard head="Site Visit" price={rmTypes["Site Visit"]} dateLabel={dateLabel} color="#05539c" icon={PlaceIcon} />
+                  <StatCard head="Video Visit" price={rmTypes["Video Visit"]} dateLabel={dateLabel} color="#8a059c" icon={VideocamIcon} />
+                  <StatCard head="Out Visit" price={rmTypes["Out Visit"]} dateLabel={dateLabel} color="#cc5f10" icon={DirectionsWalkIcon} />
+                  <StatCard head="Total Activity" price={rmUser?.activity?.total} dateLabel={dateLabel} color="#160354" icon={AutoGraphIcon} />
+                </div>
+                {rmProjects.length ? (
+                  <div className="table-responsive mt-3">
+                    <table className="table align-middle mb-0">
+                      <thead style={{ background: "#f5f7fb" }}>
+                        <tr>
+                          <th>Project</th>
+                          <th>CP Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rmProjects.map((row) => (
+                          <tr key={`${rmUser.user_id}-${row.project_id || row.project}`}>
+                            <td className="fw-semibold">{row.project || "---------"}</td>
+                            <td>{count(row.cp_count)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </>
+      ) : null}
     </div>
   );
 };

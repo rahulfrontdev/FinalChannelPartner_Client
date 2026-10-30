@@ -190,6 +190,15 @@ const CP_NavBar_Admin = () => {
                   }}
                 >Channel Partners</Link>
               </li>
+              <li className="nav-item" onClick={onRefCall}>
+                <Link className={`nav-link ${isActive('/partner/Rm')}`} href="/partner/Rm"
+                  onClick={() => {
+                    deleteCookieOnRouteChange()
+                    dispatch(setActiveLink("/partner/Rm"))
+                    setCookie("activeLink", "/partner/Rm")
+                  }}
+                >RM</Link>
+              </li>
 
               <li className="nav-item" onClick={onRefCall}>
                 <Link className={`nav-link ${isActive('/partner/PendingRequests')}`}
