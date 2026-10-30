@@ -825,6 +825,24 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
 
     },
     {
+      name: 'email',
+      label: "Email",
+      options: {
+        filter: false,
+        display: false,
+        viewColumns: false,
+      }
+    },
+    {
+      name: 'contact_number',
+      label: "Contact No",
+      options: {
+        filter: false,
+        display: false,
+        viewColumns: false,
+      }
+    },
+    {
       name: "operating_location",
       label: "Operating Location",
       options: {
@@ -1041,6 +1059,15 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       label: "Assigned to",
       options: {
         filter: true,
+        filterOptions: {
+          logic: (value, filters) => {
+            if (!filters?.length) return false;
+            const names = (Array.isArray(value) ? value : [value])
+              .map((name) => String(name ?? "").trim())
+              .filter(Boolean);
+            return !filters.some((filter) => names.includes(String(filter).trim()));
+          },
+        },
         customHeadRender: (columnMeta, updateDirection) => (
           <th className="text-center" style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: 'white', paddingLeft: "15px" }}   >
             {columnMeta.label}
@@ -1467,7 +1494,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       if (hasCookie("Channel_PartnerFilter")) {
         range = JSON.parse(getCookie("Channel_PartnerFilter"))
       }
-      const filteredColumns = columns.slice(0, -2); // Remove the last two columns
+      const filteredColumns = columns.filter((col) => col.download !== false);
 
       // Find the index of cpt_id column
       const cptIdColumnIndex = filteredColumns.findIndex(col => col.name === 'cpt_id');

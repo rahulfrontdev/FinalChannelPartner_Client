@@ -9,7 +9,6 @@ import { useSelector } from "react-redux";
 import { fetchData } from "../../../../Utils/getReq";
 import Select from "react-select";
 import { Baseurl, filesUrl, isRmRole, isBstRole } from "../../../../Utils/Constants";
-import { getZoneList } from "../../../../Utils/zoneMasterApi";
 import { Delete } from "@mui/icons-material";
 
 const AddUserScreen = () => {
@@ -61,12 +60,7 @@ const AddUserScreen = () => {
   const clientBtnColor=hasCookie("clientBtnColor") ? getCookie("clientBtnColor") : "#405189"
   const userInfoCheck=hasCookie("userInfo")?JSON.parse(getCookie("userInfo")):null;
   const isBstProfile = isBstRole(userInfoCheck?.role_id);
-  const [rrZones, setRrZones] = useState([]);
-  const [rrProjects, setRrProjects] = useState([]);
-  const [rrZone, setRrZone] = useState(null);
-  const [rrProjectId, setRrProjectId] = useState("");
   const [rrAssignments, setRrAssignments] = useState([]);
-  const [rrSaving, setRrSaving] = useState(false);
 
   const rrAuth = () => {
     const token = getCookie("token");
@@ -95,73 +89,8 @@ const AddUserScreen = () => {
     }
   };
 
-  const loadRoundRobinProjects = async (zone) => {
-    setRrProjects([]);
-    setRrProjectId("");
-    if (!zone?.zone_id || !hasCookie("token")) return;
-    try {
-      const { data } = await axios.get(
-        `${Baseurl}/db/channel/project-master?zone_id=${zone.zone_id}`,
-        rrAuth()
-      );
-      const raw = Array.isArray(data?.data) ? data.data : [];
-      setRrProjects(raw);
-    } catch (error) {
-      setRrProjects([]);
-      toast.error(error?.response?.data?.message || "Failed to load projects", { autoClose: 2500 });
-    }
-  };
-
-  const assignRoundRobin = async () => {
-    if (!updtUId || !rrZone?.zone_id || !rrProjectId) {
-      toast.error("Zone and Project are required", { autoClose: 2500 });
-      return;
-    }
-    setRrSaving(true);
-    try {
-      const { data } = await axios.post(
-        `${Baseurl}/db/channel/cp-project-assign/round-robin`,
-        {
-          user_id: Number(updtUId),
-          zone_id: Number(rrZone.zone_id),
-          project_id: Number(rrProjectId),
-        },
-        rrAuth()
-      );
-      const name = data?.data?.assigned_rm?.name;
-      toast.success(name ? `Assigned to ${name}.` : data?.message || "Assigned", { autoClose: 2500 });
-      const rows = data?.data?.assignments;
-      if (Array.isArray(rows)) setRrAssignments(rows);
-      else loadRoundRobinAssignments(updtUId);
-      setRrProjectId("");
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Something went wrong!", { autoClose: 3500 });
-    } finally {
-      setRrSaving(false);
-    }
-  };
-
-  const removeRoundRobin = async (projectId) => {
-    if (!updtUId || !projectId) return;
-    try {
-      const { data } = await axios.delete(
-        `${Baseurl}/db/channel/cp-project-assign?user_id=${updtUId}&project_id=${projectId}`,
-        rrAuth()
-      );
-      toast.success(data?.message || "Project removed", { autoClose: 2500 });
-      const rows = data?.data?.assignments;
-      if (Array.isArray(rows)) setRrAssignments(rows);
-      else loadRoundRobinAssignments(updtUId);
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to remove project", { autoClose: 2500 });
-    }
-  };
-
   useEffect(() => {
     if (!isBstProfile || !updtUId || !hasCookie("token")) return;
-    getZoneList(rrAuth())
-      .then((zones) => setRrZones(zones.filter((zone) => zone.status !== false && zone.zone_name)))
-      .catch(() => setRrZones([]));
     loadRoundRobinAssignments(updtUId);
   }, [isBstProfile, updtUId]);
 
@@ -1517,60 +1446,6 @@ const AddUserScreen = () => {
             {isBstProfile && updtUId ? (
               <div className="mt-4 mb-3">
                 <h5 className="fw-bold" style={{ color: "#293790" }}>Assign Project (Round Robin)</h5>
-                <div className="row">
-                  <div className="col-md-4 mt-2">
-                    <label className="form-label">Zone</label>
-                    <Select
-                      isSearchable
-                      isClearable
-                      placeholder="Select Zone"
-                      options={rrZones.map((zone) => ({
-                        value: String(zone.zone_id),
-                        label: zone.zone_name,
-                        zone,
-                      }))}
-                      value={rrZone ? { value: String(rrZone.zone_id), label: rrZone.zone_name } : null}
-                      onChange={(option) => {
-                        const zone = option?.zone || null;
-                        setRrZone(zone);
-                        loadRoundRobinProjects(zone);
-                      }}
-                    />
-                  </div>
-                  <div className="col-md-4 mt-2">
-                    <label className="form-label">Project</label>
-                    <Select
-                      isSearchable
-                      isClearable
-                      isDisabled={!rrZone}
-                      placeholder={rrZone ? "Select Project" : "Select Zone first"}
-                      options={rrProjects.map((project) => ({
-                        value: String(project.project_id || project.id),
-                        label: project.project || project.project_name || project.name,
-                      }))}
-                      value={
-                        rrProjects
-                          .map((project) => ({
-                            value: String(project.project_id || project.id),
-                            label: project.project || project.project_name || project.name,
-                          }))
-                          .find((option) => option.value === String(rrProjectId)) || null
-                      }
-                      onChange={(option) => setRrProjectId(option?.value || "")}
-                    />
-                  </div>
-                  <div className="col-md-4 mt-2 d-flex align-items-end">
-                    <button
-                      type="button"
-                      className="btn text-white"
-                      style={{ background: clientBtnColor }}
-                      disabled={rrSaving}
-                      onClick={assignRoundRobin}
-                    >
-                      {rrSaving ? "Assigning..." : "Assign"}
-                    </button>
-                  </div>
-                </div>
                 <div className="table-responsive mt-3">
                   <table className="table table-bordered align-middle mb-0">
                     <thead>
@@ -1578,7 +1453,6 @@ const AddUserScreen = () => {
                         <th>Project</th>
                         <th>Zone</th>
                         <th>RM</th>
-                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1587,19 +1461,10 @@ const AddUserScreen = () => {
                           <td>{item.project || item.project_name || "-"}</td>
                           <td>{item.zone || item.zone_name || "-"}</td>
                           <td>{item.rm_name || (item.rm_names || []).join(", ") || "-"}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-danger btn-sm rounded-5"
-                              onClick={() => removeRoundRobin(item.project_id)}
-                            >
-                              Remove
-                            </button>
-                          </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={4} className="text-center">No assignments</td>
+                          <td colSpan={3} className="text-center">No assignments</td>
                         </tr>
                       )}
                     </tbody>
