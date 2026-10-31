@@ -77,7 +77,7 @@ export default function ChannelSignInScreen({ setLoggedIn }) {
       dispatch(stopLoading())
     } else {
       try {
-        const clientUrl = Baseurl.replace(/\/api\/v1\/?$/, "");
+        const clientUrl = "https://connect.theprosperity.in";
         const payload = {
           email: userForm.email.toLowerCase(),
           password: userForm.password,
@@ -133,7 +133,7 @@ export default function ChannelSignInScreen({ setLoggedIn }) {
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        const baseUrl = "http://18.61.246.105";
+        const baseUrl = "https://connect.theprosperity.in";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

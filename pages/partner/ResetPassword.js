@@ -69,7 +69,7 @@ const ForgotPassword = () => {
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        let baseUrl = "http://18.61.246.105";
+        let baseUrl = "https://connect.theprosperity.in";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

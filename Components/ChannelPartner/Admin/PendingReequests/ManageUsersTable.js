@@ -90,7 +90,7 @@ const ManageUsersTable = ({
           email:email,
           user_id:id,
           report_to:report_to,
-          client_url: "http://18.61.246.105",
+          client_url: "https://connect.theprosperity.in",
         }, header);
         if (response.status === 200 || response.status === 201) {
           toast.success(response?.data?.message,{autoClose:2500});
