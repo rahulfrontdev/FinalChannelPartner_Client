@@ -236,6 +236,26 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     return [...new Set(names)].join(", ");
   };
 
+  const formatProjectNames = (assignments = []) => {
+    const names = (Array.isArray(assignments) ? assignments : [])
+      .map((item) => item?.project || item?.project_name || "")
+      .map((name) => String(name || "").trim())
+      .filter((name) => name && name !== "-");
+    return [...new Set(names)].join(", ");
+  };
+
+  const projectNamesForUser = (userCode) => {
+    const list = dataList?.find((item) => item?.user_code === userCode);
+    if (!list) return "";
+    const key = String(list.user_id ?? "");
+    const saved = rmAssignOverrideRef.current[key];
+    const fromDetails = formatProjectNames(
+      saved || assignmentDetails[key] || assignmentDetails[list.user_id] || []
+    );
+    if (fromDetails) return fromDetails;
+    return formatProjectNames(list.assigned_rm);
+  };
+
   const rmNamesFromUser = (list) => {
     if (Array.isArray(list?.assigned_rm) && list.assigned_rm.length) {
       const fromAssignments = formatAssignmentNames(list.assigned_rm);
@@ -734,7 +754,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   };
 
   useEffect(() => {
-    if (!(isBstProfile || isRmRole(userInfo?.role_id)) || !Array.isArray(dataList) || !dataList.length || !hasCookie("token")) return;
+    if (!Array.isArray(dataList) || !dataList.length || !hasCookie("token")) return;
     let cancelled = false;
     const loadAll = async () => {
       const entries = await Promise.all(
@@ -1495,9 +1515,14 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         range = JSON.parse(getCookie("Channel_PartnerFilter"))
       }
       const filteredColumns = columns.filter((col) => col.download !== false);
+      const rmColumnIndex = filteredColumns.findIndex((col) => col.name === "assignedToRm");
+      const projectColumnIndex = rmColumnIndex >= 0 ? rmColumnIndex + 1 : filteredColumns.length;
+      const columnsWithProject = [...filteredColumns];
+      columnsWithProject.splice(projectColumnIndex, 0, { label: "Project", name: "projects" });
 
       // Find the index of cpt_id column
       const cptIdColumnIndex = filteredColumns.findIndex(col => col.name === 'cpt_id');
+      const userCodeColumnIndex = filteredColumns.findIndex(col => col.name === 'user_code');
 
       const filteredData = data.map(row => {
         const rowData = filteredColumns.map((col, index) => {
@@ -1511,6 +1536,8 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
 
           return cellValue;
         });
+        const userCode = userCodeColumnIndex >= 0 ? row.data[userCodeColumnIndex] : "";
+        rowData.splice(projectColumnIndex, 0, projectNamesForUser(userCode) || "-");
         return rowData;
       });
 
@@ -1522,17 +1549,17 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         [`Date Range: ${range?.f_date ? formatDate(range?.f_date) : formatDate(start)} to ${range?.t_date ? formatDate(range?.t_date) : formatDate(end)}`],
         [],
         [],
-        filteredColumns.map(col => col.label || col.name),
+        columnsWithProject.map(col => col.label || col.name),
         ...filteredData,
       ];
 
       const worksheet = XLSX.utils.aoa_to_sheet(customData);
 
       worksheet['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 1, c: filteredColumns.length - 1 } }, // Merge A1 and A2 for the title
-        { s: { r: 2, c: 0 }, e: { r: 3, c: filteredColumns.length - 1 } }, // Merge A3 for the date range
-        { s: { r: 4, c: 0 }, e: { r: 4, c: filteredColumns.length - 1 } }, // Merge A3 for the date range
-        { s: { r: 5, c: 0 }, e: { r: 6, c: filteredColumns.length - 1 } }, // Merge A3 for the date range
+        { s: { r: 0, c: 0 }, e: { r: 1, c: columnsWithProject.length - 1 } }, // Merge A1 and A2 for the title
+        { s: { r: 2, c: 0 }, e: { r: 3, c: columnsWithProject.length - 1 } }, // Merge A3 for the date range
+        { s: { r: 4, c: 0 }, e: { r: 4, c: columnsWithProject.length - 1 } }, // Merge A3 for the date range
+        { s: { r: 5, c: 0 }, e: { r: 6, c: columnsWithProject.length - 1 } }, // Merge A3 for the date range
 
       ];
       worksheet['!cols'] = [
@@ -1544,6 +1571,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
         { wch: 18 },
         { wch: 14 },
         { wch: 24 },
+        { wch: 22 },
         { wch: 20 },
       ];
       XLSX.utils.book_append_sheet(workbook, worksheet, "PartnerReport");
