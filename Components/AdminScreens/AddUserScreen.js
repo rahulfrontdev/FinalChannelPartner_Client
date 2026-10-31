@@ -75,7 +75,9 @@ const AddUserScreen = () => {
     "Director",
     "ChannelPartner",
     "Manager",
-    "Executive"
+    "Executive",
+    // "Relational Manager"
+    "RM"
   ])
 
   async function getRolesList() {

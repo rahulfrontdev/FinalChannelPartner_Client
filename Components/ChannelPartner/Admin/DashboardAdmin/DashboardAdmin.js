@@ -621,6 +621,9 @@ const DashboardAdmin = () => {
                             </Link>
                             </div>
                         </div>
+                        <label className="m-3 fw-bold d-block" style={{ fontSize: "24px", color: "#160354" }}>
+                          Relationship Manager
+                        </label>
                         <RmDashboard
                           rm={dataList?.rm_dashboard}
                           startDate={value?.startDate}
