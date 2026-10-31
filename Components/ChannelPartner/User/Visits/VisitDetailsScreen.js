@@ -544,7 +544,7 @@ const VisitDetailsScreen = () => {
       project_name: projectName,
       schedule_visit_date: scheduleDate,
       db_name,
-      client_url: "http://18.61.246.105",
+      client_url: "https://connect.theprosperity.in",
     };
     if (scheduleTime) payload.schedule_visit_time = scheduleTime;
     if (visitType) payload.visit_type = visitType;

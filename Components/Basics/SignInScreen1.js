@@ -119,7 +119,7 @@ export default function SignInScreen({ setLoggedIn }) {
             try {
                 let baseUrl = window.location.origin;
                 if (baseUrl === "http://localhost:3000") {
-                    baseUrl = "https://srijanbandhan.com"
+                    baseUrl = "https://connect.theprosperity.in"
                 }
                 const { data } = await axios.post(Baseurl + "/db/admin/url", {
                     client_url: `${baseUrl}`,

@@ -94,7 +94,7 @@ export default function SignInScreen({ setLoggedIn }) {
           baseUrl.startsWith("http://192.168.") ||
           baseUrl.startsWith("http://172.");
         const clientUrl = isLocalDev
-          ? Baseurl.replace(/\/api\/v1\/?$/, "")
+          ? "https://connect.theprosperity.in"
           : baseUrl;
         const payload = {
           email: userForm.email.toLowerCase(),
@@ -180,7 +180,7 @@ export default function SignInScreen({ setLoggedIn }) {
         let baseUrl = window.location.origin;
         // Handle local development URLs (localhost and local IP addresses)
         if (baseUrl === "http://localhost:3000" || baseUrl.startsWith("http://10.") || baseUrl.startsWith("http://192.168.") || baseUrl.startsWith("http://172.")) {
-          baseUrl = "https://srijanbandhan.com";
+          baseUrl = "https://connect.theprosperity.in";
         }
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,

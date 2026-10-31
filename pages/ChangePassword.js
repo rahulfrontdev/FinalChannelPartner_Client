@@ -75,7 +75,7 @@ export default ChannelPartnerHOC(
           try {
             let baseUrl = window.location.origin;
             if(baseUrl==="http://localhost:3000"){
-              baseUrl="https://crm.saleofast.com"
+              baseUrl="https://connect.theprosperity.in"
             }
             const {data}=await axios.post(Baseurl+"/db/admin/url",{
               client_url:`${baseUrl}`,

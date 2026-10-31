@@ -72,7 +72,7 @@ const NewRegistrationScreen = () => {
       city_id: Number(city_id),
       Operating_Location: (operating_location || "").trim(),
       zone_name: zoneName,
-      client_url: "http://18.61.246.105",
+      client_url: "https://connect.theprosperity.in",
     };
     if (selectedZone?.zone_id !== undefined && selectedZone?.zone_id !== "") {
       payload.zone_id = Number(selectedZone.zone_id);
@@ -266,7 +266,7 @@ const NewRegistrationScreen = () => {
   useEffect(() => {
     const getSignInData = async () => {
       try {
-        const baseUrl = "http://18.61.246.105";
+        const baseUrl = "https://connect.theprosperity.in";
         const { data } = await axios.post(Baseurl + "/db/admin/url", {
           client_url: `${baseUrl}`,
         })

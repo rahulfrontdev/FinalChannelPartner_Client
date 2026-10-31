@@ -193,7 +193,7 @@ const CPRegisterLeadsTable = ({
       user: object?.first_name,
       user_l_name: object?.last_name,
       report_to: assignedToId,
-      client_url: "http://18.61.246.105",
+      client_url: "https://connect.theprosperity.in",
     }
     if (!hasCookie("token")) return;
 
@@ -261,12 +261,12 @@ const CPRegisterLeadsTable = ({
       };
       let newFormData;
       if (onBoradStage && isUserData) {
-        newFormData = { ...formData, db_name: db_name, client_url: "http://18.61.246.105", stage: isUserData?.doc_verification == 0 ? "LINK SENT" : isUserData?.doc_verification == 2 ? "ONBOARDED" : "" }
+        newFormData = { ...formData, db_name: db_name, client_url: "https://connect.theprosperity.in", stage: isUserData?.doc_verification == 0 ? "LINK SENT" : isUserData?.doc_verification == 2 ? "ONBOARDED" : "" }
         toast.warn("User Already OnBoarded")
       } else if (onBoradStage) {
-        newFormData = { ...formData, db_name: db_name, client_url: "http://18.61.246.105", stage: "LINK SENT" }
+        newFormData = { ...formData, db_name: db_name, client_url: "https://connect.theprosperity.in", stage: "LINK SENT" }
       } else {
-        newFormData = { ...formData, db_name: db_name, client_url: "http://18.61.246.105" }
+        newFormData = { ...formData, db_name: db_name, client_url: "https://connect.theprosperity.in" }
       }
 
       // Backend expects schedule_visit_date / schedule_visit_time for VISIT.
