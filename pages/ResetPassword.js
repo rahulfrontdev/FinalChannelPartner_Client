@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import LeadShyneIcon from '../Components/Svg/LeadShyneIcon'
 import Link from 'next/link'
 import axios from "axios";
-import { Baseurl, filesUrl } from "../Utils/Constants";
+import { Baseurl, ClientUrl, filesUrl } from "../Utils/Constants";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import ChannelPartnerHOC from "../HOC/ChannelPartnerHOC";

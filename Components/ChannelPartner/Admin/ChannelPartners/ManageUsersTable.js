@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import MUIDataTable from "mui-datatables";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Button, Modal } from 'react-bootstrap';
+import { Button, Modal, Table } from 'react-bootstrap';
 import Select, { components } from 'react-select';
 import axios from 'axios';
 import { Baseurl, isRmRole, isBstRole, showCpVisitScheduleColumns } from '../../../../Utils/Constants';
@@ -97,6 +97,8 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   const [currentAssignments, setCurrentAssignments] = useState([]);
   const [rmDetailsShow, setRmDetailsShow] = useState(false);
   const [rmDetailsRows, setRmDetailsRows] = useState([]);
+  const [showLeadHistory, setShowLeadHistory] = useState(false);
+  const [leadHistoryData, setLeadHistoryData] = useState([]);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [visitSaving, setVisitSaving] = useState(false);
   const [visitErrors, setVisitErrors] = useState({});
@@ -372,6 +374,29 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     }
   };
 
+  const getCplHistoryData = async (cpl_id) => {
+    if (!cpl_id || !hasCookie("token")) return;
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    try {
+      const response = await axios.get(
+        `${Baseurl}/db/channelPartnerLeads/getLeadDetails?db_name=${db_name}&cpl_id=${cpl_id}`,
+        {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            db: db_name,
+            pass: "pass",
+          },
+        }
+      );
+      setLeadHistoryData(Array.isArray(response?.data?.data) ? response.data.data : []);
+      setShowLeadHistory(true);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Something went wrong!", { autoClose: 2500 });
+    }
+  };
+
   const openScheduleVisit = (userCode) => {
     const row = dataList?.find((item) => item?.user_code === userCode);
     if (!row) return;
@@ -428,7 +453,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     if (!visitForm.email || !/\S+@\S+\.\S+/.test(visitForm.email)) {
       nextErrors.email = "Valid email is required";
     }
-    if (visitForm.stage === "FOLLOW UP" && !visitForm.follow_up_date) {
+    if ((visitForm.stage === "CALL" || visitForm.stage === "FOLLOW UP") && !visitForm.follow_up_date) {
       nextErrors.follow_up_date = "Date is required";
     }
     if (visitForm.stage === "VISIT") {
@@ -471,20 +496,31 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       return;
     }
     const timeValue = String(visitForm.schedule_visit_time || "");
-    const payload = {
-      cpl_id: visitForm.cpl_id,
-      stage: "VISIT",
-      project_id: visitForm.project_id,
-      visit_type: visitForm.visit_type,
-      schedule_visit_date: String(visitForm.schedule_visit_date || "").slice(0, 10),
-      schedule_visit_time: timeValue.length === 5 ? `${timeValue}:00` : timeValue,
-      remarks: visitForm.remarks || "",
-    };
+    const isVisit = visitForm.stage === "VISIT";
+    const payload = isVisit
+      ? {
+          cpl_id: visitForm.cpl_id,
+          stage: "VISIT",
+          project_id: visitForm.project_id,
+          visit_type: visitForm.visit_type,
+          schedule_visit_date: String(visitForm.schedule_visit_date || "").slice(0, 10),
+          schedule_visit_time: timeValue.length === 5 ? `${timeValue}:00` : timeValue,
+          remarks: visitForm.remarks || "",
+        }
+      : {
+          cpl_id: visitForm.cpl_id,
+          stage: visitForm.stage,
+          follow_up_date: String(visitForm.follow_up_date || "").slice(0, 10),
+          remarks: visitForm.remarks || "",
+        };
 
     setVisitSaving(true);
     try {
       const response = await axios.put(`${Baseurl}/db/channelPartnerLeads`, payload, header);
-      toast.success(response?.data?.message || "Visit scheduled", { autoClose: 2500 });
+      toast.success(
+        response?.data?.message || (isVisit ? "Visit scheduled" : "Stage updated"),
+        { autoClose: 2500 }
+      );
       setShowVisitModal(false);
       if (getDataList) getDataList();
     } catch (error) {
@@ -1261,6 +1297,14 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                   <EditIcon />
                 </button>
                 <button
+                  className="action_btn"
+                  title={canSchedule ? "History" : "Lead record not found"}
+                  disabled={!canSchedule}
+                  onClick={() => canSchedule && getCplHistoryData(row?.cpl_id)}
+                >
+                  <ViewIcon />
+                </button>
+                <button
                   onClick={() => openRmAssign(value)}
                   style={{ background: clientBtnColor ? clientBtnColor : `#293790`, color: "white", padding: "6px", borderRadius: "20px", border: "white" }}
                   className="pe-3 ps-3"
@@ -2000,11 +2044,18 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
             </Form.Group>
             <Form.Group className="mb-2">
               <Form.Label>Stage</Form.Label>
-              <Form.Control as="select" name="stage" value="VISIT" disabled>
+              <Form.Control
+                as="select"
+                name="stage"
+                value={visitForm.stage || "VISIT"}
+                onChange={handleVisitInput}
+              >
+                <option value="CALL">CALL</option>
+                <option value="FOLLOW UP">FOLLOW UP</option>
                 <option value="VISIT">VISIT</option>
               </Form.Control>
             </Form.Group>
-            {(visitForm.stage === "FOLLOW UP" || visitForm.stage === "VISIT") && (
+            {(visitForm.stage === "CALL" || visitForm.stage === "FOLLOW UP" || visitForm.stage === "VISIT") && (
               <Form.Group className="mb-2">
                 <Form.Label>{visitForm.stage === "VISIT" ? "Scheduled Date*" : "Date*"}</Form.Label>
                 <Form.Control
@@ -2114,6 +2165,42 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
               {visitSaving ? "Saving..." : visitForm.stage === "VISIT" ? "Schedule Visit" : "Update"}
             </Button>
           </Form>
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={showLeadHistory} onHide={() => setShowLeadHistory(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>History</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div style={{ maxHeight: "calc(5 * 45px)", overflowY: "auto" }}>
+            <Table striped bordered hover>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leadHistoryData.length ? leadHistoryData.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.stage}</td>
+                    <td>
+                      {item.follow_up_date
+                        ? moment(item.follow_up_date).format("DD MMM YYYY")
+                        : ""}
+                    </td>
+                    <td>{item.remarks || ""}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={3} className="text-center">No history</td>
+                  </tr>
+                )}
+              </tbody>
+            </Table>
+          </div>
         </Modal.Body>
       </Modal>
 

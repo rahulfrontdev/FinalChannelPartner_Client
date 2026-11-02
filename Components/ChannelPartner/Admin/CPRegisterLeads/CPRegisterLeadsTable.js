@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import MUIDataTable from "mui-datatables";
 import Link from "next/link";
-import { Baseurl, filesUrl, isRmRole, isBstRole, getVisitDateLabel, showCpVisitScheduleColumns } from "../../../../Utils/Constants";
+import { Baseurl, filesUrl, isRmRole, isBstRole, getVisitDateLabel, showCpVisitScheduleColumns, isSelfDeletedCpLead } from "../../../../Utils/Constants";
 import { Button, Modal, Form, Table } from "react-bootstrap";
 import { getCookie, hasCookie, setCookie } from "cookies-next";
 import { toast } from "react-toastify";
@@ -933,7 +933,7 @@ const CPRegisterLeadsTable = ({
                     <DeleteIcon />
                   </button>
                 </>
-                {userInfo?.isDB && (
+                {userInfo?.isDB && !isSelfDeletedCpLead(leadData) && (
                   <div
                     style={{
                       display: "flex",
@@ -967,7 +967,7 @@ const CPRegisterLeadsTable = ({
                   </div>
                 )}
                 {
-                  stage === "CONTACTED" && (
+                  stage === "CONTACTED" && !isSelfDeletedCpLead(leadData) && (
                     <button
                       className="btn text-white rounded-5" style={{ backgroundColor: clientBtnColor ? clientBtnColor : "#61E25E" }}
                       onClick={async () => {
@@ -1190,10 +1190,7 @@ const CPRegisterLeadsTable = ({
             <div className="miuiTable channelTable">
               <MUIDataTable
                 title={<CustomToolbar />}
-                data={(Array.isArray(dataList) ? dataList : []).map((lead) => ({
-                  ...lead,
-                  zone_name: lead?.zone_name || lead?.zone?.zone_name || lead?.db_zone?.zone_name || "",
-                }))}
+                data={Array.isArray(dataList) ? dataList : []}
                 columns={columns}
                 // options={options}
                 options={{
