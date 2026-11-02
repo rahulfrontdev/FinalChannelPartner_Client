@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import PlusIcon from "../../../Svg/PlusIcon";
 
@@ -36,10 +36,18 @@ const CampaignScreen = () => {
   });
   const[editMode,setEditMode]=useState(false)
   const[projects,setProjects]=useState([]);
+  const [digitalKits, setDigitalKits] = useState([]);
+  const [kitEditProjectId, setKitEditProjectId] = useState(null);
+  const [contactDraft, setContactDraft] = useState("");
+  const [reraDraft, setReraDraft] = useState("");
+  const [pendingLogoFile, setPendingLogoFile] = useState(null);
+  const [pendingLogoPreview, setPendingLogoPreview] = useState("");
+  const kitLogoInputRef = useRef(null);
   const dispatch=useDispatch()
   const {isButtonLoading}=useSelector((state)=>state.buttonLoader)
   const [loader,setLoader]=useState();
   const userInfo=hasCookie("userInfo")?JSON.parse(getCookie("userInfo")):null;
+  const canEditKit = hasCookie("channel") && userInfo?.role_id == 1;
 
   
 
@@ -66,6 +74,7 @@ const CampaignScreen = () => {
         if(response.status === 200 || response.status === 201){
           setLoader(false)
         setProjects(response?.data?.data)
+        getDigitalKits()
         }
       } catch (error) {
         if (error?.response?.data?.message) {
@@ -75,6 +84,228 @@ const CampaignScreen = () => {
           setLoader(false)
           toast.error("Something went wrong!",{autoClose:2500});
         }
+      }
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes && bytes !== 0) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const kitDetailsForProject = (projectId) => {
+    const kits = digitalKits
+      .filter((kit) => String(kit.project_id) === String(projectId))
+      .sort((a, b) => Number(b.kit_id) - Number(a.kit_id));
+    return {
+      contact: kits.find((kit) => kit.contact_detail)?.contact_detail || "",
+      rera: kits.find((kit) => kit.rera_number)?.rera_number || "",
+      logoUrl: kits.find((kit) => kit.logo_url)?.logo_url || "",
+    };
+  };
+
+  const resizeLogoFile = async (file) => {
+    try {
+      if (typeof createImageBitmap !== "function") return file;
+      const bitmap = await createImageBitmap(file);
+      const max = 320;
+      const scale = Math.min(1, max / Math.max(bitmap.width || 1, bitmap.height || 1));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        bitmap.close();
+        return file;
+      }
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) return file;
+      const name = String(file.name || "logo").replace(/\.\w+$/, "") + ".png";
+      return new File([blob], name, { type: "image/png" });
+    } catch (_error) {
+      return file;
+    }
+  };
+
+  const clearKitEdit = () => {
+    if (pendingLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(pendingLogoPreview);
+    setKitEditProjectId(null);
+    setContactDraft("");
+    setReraDraft("");
+    setPendingLogoFile(null);
+    setPendingLogoPreview("");
+    if (kitLogoInputRef.current) kitLogoInputRef.current.value = "";
+  };
+
+  const pickKitLogo = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const name = (file.name || "").toLowerCase();
+    if (!/\.(jpg|jpeg|png)$/.test(name)) {
+      toast.error("Property logo must be a jpg or png image", { autoClose: 2500 });
+      return;
+    }
+    const resized = await resizeLogoFile(file);
+    if (pendingLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(pendingLogoPreview);
+    setPendingLogoFile(resized);
+    setPendingLogoPreview(URL.createObjectURL(resized));
+  };
+
+  const isPdfKit = (item) =>
+    item?.kind === "pdf" || String(item?.file_name || "").toLowerCase().endsWith(".pdf");
+
+  const readBlobError = async (error, fallback) => {
+    const data = error?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await data.text());
+        if (parsed?.message) return parsed.message;
+      } catch (_parseError) {
+        return fallback;
+      }
+    }
+    return error?.response?.data?.message || fallback;
+  };
+
+  const fetchStampedPdf = async (item, forView) => {
+    if (!hasCookie("token")) return null;
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    const response = await axios.get(
+      `${Baseurl}/db/channel/digital-kit/${item.kit_id}/download${forView ? "?view=1" : ""}`,
+      {
+        headers: {
+          Authorization: "Bearer ".concat(token),
+          db: db_name,
+          m_id: 76,
+        },
+        responseType: "blob",
+      }
+    );
+    return new Blob([response.data], { type: "application/pdf" });
+  };
+
+  const showPdfPreview = (preview, blob, fileName) => {
+    const url = URL.createObjectURL(blob);
+    const title = String(fileName || "PDF").replace(/[<>&"]/g, "");
+    preview.document.open();
+    preview.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>html,body{margin:0;height:100%;background:#525659}iframe{border:0;width:100%;height:100%}</style></head><body><iframe src="${url}" title="${title}"></iframe></body></html>`
+    );
+    preview.document.close();
+  };
+
+  const openKitFile = async (item) => {
+    if (isPdfKit(item)) {
+      const preview = window.open("", "_blank");
+      if (!preview) {
+        toast.error("Allow pop-ups to view the PDF", { autoClose: 2500 });
+        return;
+      }
+      preview.document.write("<p style=\"font-family:sans-serif;padding:24px\">Opening PDF...</p>");
+      try {
+        const blob = await fetchStampedPdf(item, true);
+        if (!blob) {
+          preview.close();
+          return;
+        }
+        showPdfPreview(preview, blob, item.file_name);
+      } catch (error) {
+        preview.close();
+        toast.error(await readBlobError(error, "Could not open the file"), { autoClose: 2500 });
+      }
+      return;
+    }
+    if (!item.play_url) {
+      toast.error("File link is not available", { autoClose: 2000 });
+      return;
+    }
+    window.open(item.play_url, "_blank", "noopener,noreferrer");
+  };
+
+  const downloadKitFile = async (item) => {
+    if (!isPdfKit(item)) {
+      if (!item.download_url) {
+        toast.error("Download link is not available", { autoClose: 2000 });
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = item.download_url;
+      link.download = item.file_name || "download";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      return;
+    }
+    try {
+      const blob = await fetchStampedPdf(item);
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = item.file_name || "download.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(await readBlobError(error, "Could not download the file"), { autoClose: 2500 });
+    }
+  };
+
+  const saveKitEdit = async (projectId) => {
+    if (!projectId || !hasCookie("token")) return;
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("contact_detail", contactDraft.trim());
+    formData.append("rera_number", reraDraft.trim());
+    if (pendingLogoFile) formData.append("logo", pendingLogoFile);
+    try {
+      await axios.put(`${Baseurl}/db/channel/digital-kit/details`, formData, {
+        headers: {
+          Accept: "application/json",
+          Authorization: "Bearer ".concat(token),
+          db: db_name,
+          m_id: 76,
+        },
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+      });
+      toast.success("Updated successfully", { autoClose: 2500 });
+      clearKitEdit();
+      await getDigitalKits();
+    } catch (error) {
+      const message = error?.response?.data?.message || "Could not update digital kit";
+      toast.error(message, { autoClose: 2500 });
+    }
+  };
+
+  const getDigitalKits = async () => {
+    if (!hasCookie("token")) return;
+    const token = getCookie("token");
+    const db_name = getCookie("db_name");
+    try {
+      const response = await axios.get(`${Baseurl}/db/channel/digital-kit`, {
+        headers: {
+          Accept: "application/json",
+          Authorization: "Bearer ".concat(token),
+          db: db_name,
+          m_id: 76,
+        },
+      });
+      setDigitalKits(response?.data?.data || []);
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        toast.error(error.response.data.message, { autoClose: 2500 });
       }
     }
   };
@@ -347,7 +578,8 @@ const CampaignScreen = () => {
         <div className="ps-4 pe-4 pb-4 w-100 mt-4 overflow-auto">
         
         <section className="Channel-profile Booking-Detail Visit-Details Campaigns  pb-2 bg-white">
-          <div className="container mt-3 mb-4">
+          <div className="container mt-3 mb-4" style={{ padding: "8px 12px 20px" }}>
+            {false && (
             <div className="row gx-4 gy-4">
               <div className="profile-text">Campaigns</div>
             {
@@ -405,6 +637,183 @@ const CampaignScreen = () => {
               </div>
                 ))
             }
+            </div>
+            )}
+            <div className="fw-semibold" style={{ margin: "4px 4px 16px", fontSize: 18 }}>Digital Kit</div>
+            <input
+              ref={kitLogoInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png"
+              onChange={pickKitLogo}
+              style={{ display: "none" }}
+            />
+            <div className="d-flex flex-column gap-3">
+              {!digitalKits.length && (
+                <small className="text-muted">No digital kits uploaded yet.</small>
+              )}
+              {projects
+                .filter((project) => digitalKits.some((kit) => String(kit.project_id) === String(project.project_id)))
+                .map((project) => (
+                  <div key={project.project_id} className="bg-white border rounded-3 p-3" style={{ boxShadow: "0 1px 4px rgba(38, 32, 59, 0.06)" }}>
+                    {(() => {
+                      const details = kitDetailsForProject(project.project_id);
+                      const isEditing = canEditKit && kitEditProjectId === project.project_id;
+                      const logoSrc = isEditing && pendingLogoPreview ? pendingLogoPreview : details.logoUrl;
+                      return (
+                        <div className="d-flex align-items-center gap-3 mb-3">
+                          {logoSrc ? (
+                            <span style={{ width: 48, height: 48, overflow: "hidden", flexShrink: 0, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", padding: 4 }}>
+                              <img
+                                src={logoSrc}
+                                alt="Property logo"
+                                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                              />
+                            </span>
+                          ) : (
+                            <div
+                              className="d-flex align-items-center justify-content-center text-muted"
+                              style={{ width: 48, height: 48, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", fontSize: 10, textAlign: "center", flexShrink: 0, lineHeight: 1.1 }}
+                            >
+                              No logo
+                            </div>
+                          )}
+                          <div className="overflow-hidden flex-grow-1">
+                            <div className="fw-semibold text-truncate" style={{ fontSize: 14 }}>{project.project}</div>
+                            {isEditing ? (
+                              <div className="d-flex align-items-end gap-2 mt-1 flex-wrap">
+                                <div>
+                                  <label className="d-block mb-1" style={{ fontSize: 11, color: "#9C9AA5" }}>Phone number</label>
+                                  <input
+                                    type="text"
+                                    value={contactDraft}
+                                    autoFocus
+                                    placeholder="Phone number"
+                                    onChange={(e) => setContactDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveKitEdit(project.project_id);
+                                    }}
+                                    style={{ height: 28, fontSize: 12, width: 160, border: "1px solid #ddd", borderRadius: 4, padding: "2px 8px" }}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="d-block mb-1" style={{ fontSize: 11, color: "#9C9AA5" }}>RERA number</label>
+                                  <input
+                                    type="text"
+                                    value={reraDraft}
+                                    placeholder="RERA number"
+                                    onChange={(e) => setReraDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveKitEdit(project.project_id);
+                                    }}
+                                    style={{ height: 28, fontSize: 12, width: 160, border: "1px solid #ddd", borderRadius: 4, padding: "2px 8px" }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  className="kit-action-btn"
+                                  style={{ color: clientBtnColor, border: `1px solid ${clientBtnColor}`, background: "#fff" }}
+                                  onClick={() => kitLogoInputRef.current?.click()}
+                                >
+                                  Logo
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="text-muted text-truncate" style={{ fontSize: 12 }}>{details.contact ? `Phone number ${details.contact}` : "No phone number"}</div>
+                                <div className="text-muted text-truncate" style={{ fontSize: 12 }}>{details.rera ? `RERA number ${details.rera}` : "No RERA number"}</div>
+                              </>
+                            )}
+                          </div>
+                          {canEditKit && (
+                            isEditing ? (
+                              <button
+                                type="button"
+                                className="kit-action-btn flex-shrink-0"
+                                style={{ color: "#fff", border: "none", background: clientBtnColor }}
+                                onClick={() => saveKitEdit(project.project_id)}
+                              >
+                                Save
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="kit-action-btn flex-shrink-0"
+                                style={{
+                                  color: clientBtnColor,
+                                  border: `1px solid ${clientBtnColor}`,
+                                  background: "#fff",
+                                }}
+                                onClick={() => {
+                                  if (pendingLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(pendingLogoPreview);
+                                  setPendingLogoFile(null);
+                                  setPendingLogoPreview("");
+                                  setKitEditProjectId(project.project_id);
+                                  setContactDraft(details.contact || "");
+                                  setReraDraft(details.rera || "");
+                                }}
+                              >
+                                Edit
+                              </button>
+                            )
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <div className="d-flex flex-column gap-2">
+                      {digitalKits
+                        .filter((kit) => String(kit.project_id) === String(project.project_id))
+                        .sort((a, b) => Number(b.kit_id) - Number(a.kit_id))
+                        .slice(0, 2)
+                        .map((item) => (
+                          <div
+                            key={item.kit_id}
+                            className="d-flex align-items-center justify-content-between rounded px-3 py-2 gap-2"
+                            style={{ background: "#F7F8FA" }}
+                          >
+                            <div className="d-flex align-items-center gap-2 overflow-hidden">
+                              <span
+                                className="text-uppercase small fw-semibold px-2 py-1 rounded"
+                                style={{
+                                  background: "#F1F2F6",
+                                  color: clientBtnColor,
+                                  minWidth: 48,
+                                  textAlign: "center",
+                                }}
+                              >
+                                {item.kind}
+                              </span>
+                              <div className="overflow-hidden">
+                                <div className="text-truncate" title={item.file_name}>{item.file_name}</div>
+                                <small className="text-muted">{formatFileSize(Number(item.file_size || 0))}</small>
+                              </div>
+                            </div>
+                            <div className="d-flex align-items-center gap-2">
+                              <button
+                                type="button"
+                                className="btn kit-action-btn"
+                                style={{
+                                  color: clientBtnColor,
+                                  border: `1px solid ${clientBtnColor}`,
+                                  background: "transparent",
+                                }}
+                                onClick={() => openKitFile(item)}
+                              >
+                                {item.kind === "video" ? "Play" : "View"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn kit-action-btn text-white"
+                                style={{ background: clientBtnColor }}
+                                onClick={() => downloadKitFile(item)}
+                              >
+                                Download
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         </section>
