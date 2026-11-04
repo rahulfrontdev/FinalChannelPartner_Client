@@ -433,7 +433,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
 
     const cpVisitColumns = [
       {
-        name: 'cpl_id',
+        name: 'lead_id',
         label: "Lead ID",
         options: {
           filter: false,
@@ -676,9 +676,14 @@ const [value, setValue] = useState(getCurrentWeekDates());
       (Array.isArray(dataList) ? dataList : []).forEach((list) => {
         const cplId = list?.cpl_id;
         if (cplId == null || leadMap[cplId]) return;
-        if (allowedIds && !allowedIds.has(String(cplId))) return;
+        if (
+          allowedIds &&
+          !allowedIds.has(String(cplId)) &&
+          !allowedIds.has(String(list?.lead_id || ""))
+        ) return;
         leadMap[cplId] = {
           cpl_id: cplId,
+          lead_id: list?.lead_id || "",
           leadName:
             list?.name ||
             `${list?.first_name || ""} ${list?.last_name || ""}`.trim() ||
@@ -738,7 +743,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
 
         if (!history.length) {
           reportRows.push([
-            lead.cpl_id,
+            lead.lead_id || lead.cpl_id,
             leadName,
             email,
             contact,
@@ -768,7 +773,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
             "";
           const status = getCpVisitStatusLabel(item);
           reportRows.push([
-            isFirst ? lead.cpl_id : "",
+            isFirst ? (lead.lead_id || lead.cpl_id) : "",
             isFirst ? leadName : "",
             isFirst ? email : "",
             isFirst ? contact : "",
@@ -855,11 +860,12 @@ const [value, setValue] = useState(getCurrentWeekDates());
         customSearch: customTableSearch,
         onDownload: (buildHead, buildBody, columns, data) => {
               if (visitType === "cp") {
-                const idIndex = (columns || []).findIndex((col) => col.name === "cpl_id");
-                const visibleIds = (data || []).map((row) => {
-                  const cplId = idIndex >= 0 ? row?.data?.[idIndex] : null;
-                  return cplId == null || typeof cplId === "object" ? null : cplId;
-                }).filter((id) => id != null && id !== "");
+                const idIndexes = (columns || [])
+                  .map((col, index) => (col.name === "cpl_id" || col.name === "lead_id" ? index : -1))
+                  .filter((index) => index >= 0);
+                const visibleIds = (data || []).flatMap((row) => (
+                  idIndexes.map((index) => row?.data?.[index])
+                )).filter((id) => id != null && id !== "" && typeof id !== "object");
                 downloadCpVisitReport(visibleIds);
                 return false;
               }
@@ -937,6 +943,7 @@ const [value, setValue] = useState(getCurrentWeekDates());
         if (!byLead[cplId]) {
           byLead[cplId] = {
             cpl_id: cplId,
+            lead_id: list?.lead_id || "",
             leadName: list?.name || `${list?.first_name || ""} ${list?.last_name || ""}`.trim(),
             email: list?.email,
             contact: list?.contact,

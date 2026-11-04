@@ -15,7 +15,6 @@ import VideocamIcon from "@mui/icons-material/Videocam";
 import PlaceIcon from "@mui/icons-material/Place";
 import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
 import AutoGraphIcon from "@mui/icons-material/AutoGraph";
-import BookOnlineIcon from "@mui/icons-material/BookOnline";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 
 const VISIT_TYPES = ["Site Visit", "Video Visit", "Out Visit"];
@@ -120,7 +119,6 @@ const RmDashboard = ({ rm = {}, startDate, endDate }) => {
   const activity = rm?.activity || {};
   const stages = activity.by_stage && typeof activity.by_stage === "object" ? activity.by_stage : {};
   const leadStages = rm?.cp_lead_stages && typeof rm.cp_lead_stages === "object" ? rm.cp_lead_stages : {};
-  const business = rm?.cp_business || {};
   const projects = Array.isArray(cps.by_project) ? cps.by_project : [];
   const upcoming = Array.isArray(rm?.upcoming_visits) ? rm.upcoming_visits : [];
   const completed = Array.isArray(rm?.recent_completed_visits) ? rm.recent_completed_visits : [];
@@ -272,24 +270,6 @@ const RmDashboard = ({ rm = {}, startDate, endDate }) => {
         ) : (
           <div className="text-muted px-3">No lead stages in this range</div>
         )}
-      </div>
-
-      <SectionTitle>Business</SectionTitle>
-      <div className="row leads_row addgap">
-        <StatCard
-          head="Leads"
-          price={business.leads}
-          dateLabel={dateLabel}
-          color="#05539c"
-          icon={Diversity3Icon}
-        />
-        <StatCard
-          head="Bookings"
-          price={business.bookings}
-          dateLabel={dateLabel}
-          color="#9c0550"
-          icon={BookOnlineIcon}
-        />
       </div>
 
       <SectionTitle>Project-wise CPs</SectionTitle>

@@ -39,6 +39,7 @@ import { MenuItem } from '@mui/material';
 import { VisitReport } from './visitReport';
 import { OpenReport } from './OpenReport';
 import { BookingReport } from './BookingReport';
+import RmGroupReport from './RmGroupReport';
 import RmDashboard from '../../User/DashboardUser/RmDashboard';
 
 
@@ -403,12 +404,13 @@ const DashboardAdmin = () => {
                                <MenuItem value={2}>Visit Report</MenuItem>
                                <MenuItem value={3}>Booking Report</MenuItem>
                                <MenuItem value={4}>Open Report</MenuItem>
+                               <MenuItem value={5}>RM Report</MenuItem>
 
                              </Select>
                        </FormControl>
                         </div>
                     </div>
-                    {screen == 2 ?<VisitReport startDate={value?.startDate} endDate={value?.endDate} dateFilter={value?.dateFilter} /> : screen == 3 ? <BookingReport startDate={value?.startDate} endDate={value?.endDate}/>  : screen == 4 ? <OpenReport startDate={value?.startDate} endDate={value?.endDate}/>
+                    {screen == 2 ?<VisitReport startDate={value?.startDate} endDate={value?.endDate} dateFilter={value?.dateFilter} /> : screen == 3 ? <BookingReport startDate={value?.startDate} endDate={value?.endDate}/>  : screen == 4 ? <OpenReport startDate={value?.startDate} endDate={value?.endDate}/> : screen == 5 ? <RmGroupReport />
                  
                    :
                    <div className="cards_Box ">

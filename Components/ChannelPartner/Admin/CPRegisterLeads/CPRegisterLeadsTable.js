@@ -45,6 +45,15 @@ const CPRegisterLeadsTable = ({
       ? Number(userInfo?.role_id)
       : undefined;
   const isBst = currentRoleId === 2;
+  const isHodTitle = (user) =>
+    [
+      user?.db_user_profile?.db_designation?.designation,
+      user?.designation,
+      user?.group,
+      user?.db_user_profile?.group,
+    ].some((value) => String(value || "").replace(/[^a-z]/gi, "").toLowerCase() === "hod");
+  const [isHod, setIsHod] = useState(() => isHodTitle(userInfo));
+  const canAssignLead = !!userInfo?.isDB || isHod;
   // Admin (and DB users) / RM can edit contact/email. BST must not.
   const canEditContactEmail = !isBst && (userInfo?.isDB || currentRoleId === 3 || isRmRole(userInfo?.role_id));
   const showScheduleTimeField = showCpVisitScheduleColumns(userInfo);
@@ -110,6 +119,21 @@ const CPRegisterLeadsTable = ({
   useEffect(() => {
     getUsersList();
     getProjectList();
+    if (isHodTitle(userInfo) || !userInfo?.user_id || !hasCookie("token")) return;
+    const header = {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${getCookie("token")}`,
+        db: getCookie("db_name"),
+        pass: "pass",
+      },
+    };
+    axios.get(`${Baseurl}/db/users?id=${userInfo.user_id}`, header)
+      .then((response) => {
+        const record = response?.data?.data;
+        if (isHodTitle(record)) setIsHod(true);
+      })
+      .catch(() => {});
   }, []);
 
   const getCurrentWeekDates = () => {
@@ -822,7 +846,7 @@ const CPRegisterLeadsTable = ({
       label: "Assigned To",
       options: {
         filter: true,
-        display: (userInfo?.isDB || userInfo?.role_id == 3) ? true : false,
+        display: (canAssignLead || userInfo?.role_id == 3) ? true : false,
         customHeadRender: (columnMeta, updateDirection) => (
           <th style={headerCellStyle}>
             {columnMeta.label}
@@ -933,7 +957,7 @@ const CPRegisterLeadsTable = ({
                     <DeleteIcon />
                   </button>
                 </>
-                {userInfo?.isDB && !isSelfDeletedCpLead(leadData) && (
+                {canAssignLead && !isSelfDeletedCpLead(leadData) && (
                   <div
                     style={{
                       display: "flex",
