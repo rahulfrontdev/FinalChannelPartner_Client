@@ -1095,7 +1095,7 @@ const VisitDetailsScreen = () => {
           <ul className="list-group General-list h-auto rounded-0 m-0">
             <li style={{background:`${clientBtnColor}`}} href="#" className="list-group-item list-group-item-action  text-white d-flex justify-content-between" aria-current="true">
               <span className="lead-id text-white">
-                {isCpVisit ? `CPL-${visitData?.cpl_id || id}` : visitData?.visit_code}
+                {isCpVisit ? (visitData?.lead_id || `CPL-${visitData?.cpl_id || id}`) : visitData?.visit_code}
               </span>
             </li>
           </ul>

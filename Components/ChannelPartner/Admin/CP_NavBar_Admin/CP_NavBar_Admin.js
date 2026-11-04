@@ -154,13 +154,13 @@ const CP_NavBar_Admin = () => {
               {
                 hasCookie("channel") && (
                   // hasCookie("channel") && allowedpermission?.length>1 && (
-                  <li className='nav-item cursor-pointer pt-2' onClick={() => {
+                  <li className='nav-item cursor-pointer d-flex align-items-center' onClick={() => {
                     deleteCookieOnRouteChange()
                     deleteCookie("channel")
                     dispatch(clearValue())
                     router.push("/")
                     onRefCall()
-                  }}><img src='/switch.svg' style={{ width: "15px", marginTop: "4px" }} /></li>
+                  }}><img src='/switch.svg' alt="" style={{ width: "15px" }} /></li>
                 )
               }
               <li className="nav-item" onClick={onRefCall} >
@@ -226,17 +226,30 @@ const CP_NavBar_Admin = () => {
               </li>
               <li className="nav-item" onClick={onRefCall}>
                 <Link
-                  className={`nav-link ${isActive(
-                    "/partner/Visits"
-                  )}`}
-                  href="/partner/Visits"
+                  className={`nav-link ${(router.pathname === "/partner/Visits" || router.pathname === "/partner/VisitDetails") && (router.query.type === "cp" || (!router.query.type && getCookie("VisitTypeTab") === "cp")) ? "" : isActive("/partner/Visits")}`}
+                  href="/partner/Visits?type=client"
                   onClick={() => {
                     router.pathname == "/partner/Visits" || router.pathname == "/partner/VisitDetails" ? "" : deleteCookieOnRouteChange()
+                    setCookie("VisitTypeTab", "client")
                     dispatch(setActiveLink("/partner/Visits"))
                     setCookie("activeLink", "/partner/Visits")
                   }}
                 >
                   Visits
+                </Link>
+              </li>
+              <li className="nav-item" onClick={onRefCall}>
+                <Link
+                  className={`nav-link ${(router.pathname === "/partner/Visits" || router.pathname === "/partner/VisitDetails") && (router.query.type === "cp" || (!router.query.type && getCookie("VisitTypeTab") === "cp")) ? "active" : isActive("/partner/CpVisits")}`}
+                  href="/partner/Visits?type=cp"
+                  onClick={() => {
+                    router.pathname == "/partner/Visits" || router.pathname == "/partner/VisitDetails" ? "" : deleteCookieOnRouteChange()
+                    setCookie("VisitTypeTab", "cp")
+                    dispatch(setActiveLink("/partner/CpVisits"))
+                    setCookie("activeLink", "/partner/CpVisits")
+                  }}
+                >
+                  CP Visit
                 </Link>
               </li>
               <li className="nav-item" onClick={onRefCall}>

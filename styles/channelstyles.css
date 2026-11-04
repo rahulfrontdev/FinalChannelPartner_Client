@@ -573,6 +573,26 @@
   font-weight: 400;
   padding: 0;
 }
+
+.navbar.navbar-expand-xl {
+  flex-wrap: nowrap;
+}
+
+.navbar.navbar-expand-xl .navbar-collapse {
+  flex-wrap: nowrap;
+}
+
+.navbar.navbar-expand-xl .navbar-nav {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.navbar.navbar-expand-xl .navbar-nav .nav-link {
+  white-space: nowrap;
+  font-size: 14px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
 /* Dashboard End */
 
 /* Channel Profile Start*/
@@ -648,14 +668,15 @@
   height: auto !important;
   width: auto !important;
   min-width: 0 !important;
-  border-radius: 12px !important;
-  padding: 2px 8px !important;
-  font-size: 10px !important;
-  font-weight: 600;
-  line-height: 1.2;
+  border-radius: 20px !important;
+  padding: 4px 12px !important;
+  font-size: inherit !important;
+  font-weight: 400;
+  line-height: 1.5;
   white-space: nowrap;
   border: none;
   color: #fff;
+  display: inline-block;
 }
 
 .Channel-profile .name {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Link from "next/link";
 import MUIDataTable from "mui-datatables";
 import { getCookie, hasCookie } from "cookies-next";
 import { toast } from "react-toastify";
@@ -20,6 +21,23 @@ const RmScreen = () => {
   );
 
   const columns = [
+    {
+      name: "user_code",
+      label: "User Code",
+      options: {
+        filter: true,
+        customHeadRender: (columnMeta) => headerCell(columnMeta.label),
+        customBodyRender: (value) => (
+          <Link
+            href={`/partner/RmDetails?user_code=${value}`}
+            className="fw-bold text-decoration-underline"
+            style={{ color: "#293790" }}
+          >
+            {value}
+          </Link>
+        ),
+      },
+    },
     {
       name: "user",
       label: "Name",
@@ -53,14 +71,6 @@ const RmScreen = () => {
       },
     },
     {
-      name: "user_code",
-      label: "User Code",
-      options: {
-        filter: true,
-        customHeadRender: (columnMeta) => headerCell(columnMeta.label),
-      },
-    },
-    {
       name: "reportTo",
       label: "Report/Assign To",
       options: {
@@ -71,6 +81,14 @@ const RmScreen = () => {
     {
       name: "group",
       label: "Group",
+      options: {
+        filter: true,
+        customHeadRender: (columnMeta) => headerCell(columnMeta.label),
+      },
+    },
+    {
+      name: "project",
+      label: "Project",
       options: {
         filter: true,
         customHeadRender: (columnMeta) => headerCell(columnMeta.label),
@@ -119,8 +137,11 @@ const RmScreen = () => {
           email: user?.email || "",
           contact_number: user?.contact_number || user?.contact || user?.mobile || "",
           user_code: user?.user_code || "",
-          reportTo: user?.reportToUser?.user || user?.report_to_name || user?.assigned_to || "",
+          reportTo: user?.reportToUser?.user || user?.assign_to || user?.report_to_name || user?.assigned_to || "",
           group: user?.group || "",
+          project: Array.isArray(user?.projects) && user.projects.length
+            ? user.projects.map((item) => item?.project_name).filter(Boolean).join(", ")
+            : user?.project_name || "",
           statusLabel: user?.user_status === false || user?.user_status === 0 || String(user?.status || "").toLowerCase() === "inactive" ? "inactive" : "active",
         }))
       );

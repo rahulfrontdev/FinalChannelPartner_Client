@@ -374,23 +374,28 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     }
   };
 
-  const getCplHistoryData = async (cpl_id) => {
-    if (!cpl_id || !hasCookie("token")) return;
+  const fetchLeadHistory = async (cpl_id) => {
+    if (!cpl_id || !hasCookie("token")) return [];
     const token = getCookie("token");
     const db_name = getCookie("db_name");
+    const response = await axios.get(
+      `${Baseurl}/db/channelPartnerLeads/getLeadDetails?db_name=${db_name}&cpl_id=${cpl_id}`,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          db: db_name,
+          pass: "pass",
+        },
+      }
+    );
+    return Array.isArray(response?.data?.data) ? response.data.data : [];
+  };
+
+  const getCplHistoryData = async (cpl_id) => {
+    if (!cpl_id || !hasCookie("token")) return;
     try {
-      const response = await axios.get(
-        `${Baseurl}/db/channelPartnerLeads/getLeadDetails?db_name=${db_name}&cpl_id=${cpl_id}`,
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-            db: db_name,
-            pass: "pass",
-          },
-        }
-      );
-      setLeadHistoryData(Array.isArray(response?.data?.data) ? response.data.data : []);
+      setLeadHistoryData(await fetchLeadHistory(cpl_id));
       setShowLeadHistory(true);
     } catch (error) {
       toast.error(error?.response?.data?.message || "Something went wrong!", { autoClose: 2500 });
@@ -1553,73 +1558,123 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     viewColumns: false,
     customSearch: customTableSearch,
     onDownload: (buildHead, buildBody, columns, data) => {
-      const workbook = XLSX.utils.book_new();
-      let range;
-      if (hasCookie("Channel_PartnerFilter")) {
-        range = JSON.parse(getCookie("Channel_PartnerFilter"))
-      }
-      const filteredColumns = columns.filter((col) => col.download !== false);
-      const rmColumnIndex = filteredColumns.findIndex((col) => col.name === "assignedToRm");
-      const projectColumnIndex = rmColumnIndex >= 0 ? rmColumnIndex + 1 : filteredColumns.length;
-      const columnsWithProject = [...filteredColumns];
-      columnsWithProject.splice(projectColumnIndex, 0, { label: "Project", name: "projects" });
+      const writePartnerReport = (historyByCode = {}) => {
+        const workbook = XLSX.utils.book_new();
+        let range;
+        if (hasCookie("Channel_PartnerFilter")) {
+          range = JSON.parse(getCookie("Channel_PartnerFilter"))
+        }
+        const filteredColumns = columns.filter((col) => col.download !== false);
+        const rmColumnIndex = filteredColumns.findIndex((col) => col.name === "assignedToRm");
+        const projectColumnIndex = rmColumnIndex >= 0 ? rmColumnIndex + 1 : filteredColumns.length;
+        const columnsWithProject = [...filteredColumns];
+        columnsWithProject.splice(projectColumnIndex, 0, { label: "Project", name: "projects" });
+        if (isRmProfile) {
+          columnsWithProject.push(
+            { label: "Latest Remarks", name: "latest_remarks" },
+            { label: "Remarks (All History)", name: "all_remarks" },
+          );
+        }
 
-      // Find the index of cpt_id column
-      const cptIdColumnIndex = filteredColumns.findIndex(col => col.name === 'cpt_id');
-      const userCodeColumnIndex = filteredColumns.findIndex(col => col.name === 'user_code');
+        const cptIdColumnIndex = filteredColumns.findIndex(col => col.name === 'cpt_id');
+        const userCodeColumnIndex = filteredColumns.findIndex(col => col.name === 'user_code');
 
-      const filteredData = data.map(row => {
-        const rowData = filteredColumns.map((col, index) => {
-          let cellValue = row.data[index];
+        const filteredData = data.flatMap(row => {
+          const rowData = filteredColumns.map((col, index) => {
+            let cellValue = row.data[index];
 
-          // If this is the cpt_id column, map the value to partner type name
-          if (index === cptIdColumnIndex && cellValue !== null && cellValue !== undefined) {
-            const partnerType = partnerTypes?.find(pt => pt.cpt_id === cellValue || pt.cpt_id === Number(cellValue));
-            return partnerType ? partnerType.name : cellValue;
-          }
+            if (index === cptIdColumnIndex && cellValue !== null && cellValue !== undefined) {
+              const partnerType = partnerTypes?.find(pt => pt.cpt_id === cellValue || pt.cpt_id === Number(cellValue));
+              return partnerType ? partnerType.name : cellValue;
+            }
 
-          return cellValue;
+            return cellValue;
+          });
+          const userCode = userCodeColumnIndex >= 0 ? row.data[userCodeColumnIndex] : "";
+          rowData.splice(projectColumnIndex, 0, projectNamesForUser(userCode) || "-");
+          if (!isRmProfile) return [rowData];
+
+          const history = historyByCode[userCode] || [];
+          const withRemarks = history.filter((item) => item?.remarks);
+          const latestRemarks = withRemarks[0]?.remarks || "";
+          const allRemarks = withRemarks
+            .map((item) => `${moment(item.follow_up_date).format("DD/MM/YY")}: ${item.remarks}`)
+            .join(" | ");
+          return [[...rowData, latestRemarks, allRemarks]];
         });
-        const userCode = userCodeColumnIndex >= 0 ? row.data[userCodeColumnIndex] : "";
-        rowData.splice(projectColumnIndex, 0, projectNamesForUser(userCode) || "-");
-        return rowData;
-      });
 
-      const customData = [
-        ["Partner Report"],
-        [],
-        [`Filter by:`],
-        [],
-        [`Date Range: ${range?.f_date ? formatDate(range?.f_date) : formatDate(start)} to ${range?.t_date ? formatDate(range?.t_date) : formatDate(end)}`],
-        [],
-        [],
-        columnsWithProject.map(col => col.label || col.name),
-        ...filteredData,
-      ];
+        const customData = [
+          ["Partner Report"],
+          [],
+          [`Filter by:`],
+          [],
+          [`Date Range: ${range?.f_date ? formatDate(range?.f_date) : formatDate(start)} to ${range?.t_date ? formatDate(range?.t_date) : formatDate(end)}`],
+          [],
+          [],
+          columnsWithProject.map(col => col.label || col.name),
+          ...filteredData,
+        ];
 
-      const worksheet = XLSX.utils.aoa_to_sheet(customData);
+        const worksheet = XLSX.utils.aoa_to_sheet(customData);
 
-      worksheet['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 1, c: columnsWithProject.length - 1 } }, // Merge A1 and A2 for the title
-        { s: { r: 2, c: 0 }, e: { r: 3, c: columnsWithProject.length - 1 } }, // Merge A3 for the date range
-        { s: { r: 4, c: 0 }, e: { r: 4, c: columnsWithProject.length - 1 } }, // Merge A3 for the date range
-        { s: { r: 5, c: 0 }, e: { r: 6, c: columnsWithProject.length - 1 } }, // Merge A3 for the date range
+        worksheet['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 1, c: columnsWithProject.length - 1 } },
+          { s: { r: 2, c: 0 }, e: { r: 3, c: columnsWithProject.length - 1 } },
+          { s: { r: 4, c: 0 }, e: { r: 4, c: columnsWithProject.length - 1 } },
+          { s: { r: 5, c: 0 }, e: { r: 6, c: columnsWithProject.length - 1 } },
+        ];
+        worksheet['!cols'] = [
+          { wch: 14 },
+          { wch: 20 },
+          { wch: 22 },
+          { wch: 12 },
+          { wch: 14 },
+          { wch: 18 },
+          { wch: 14 },
+          { wch: 24 },
+          { wch: 22 },
+          { wch: 20 },
+          { wch: 18 },
+          { wch: 16 },
+          { wch: 24 },
+          { wch: 30 },
+          { wch: 60 },
+        ];
+        XLSX.utils.book_append_sheet(workbook, worksheet, "PartnerReport");
+        XLSX.writeFile(workbook, "PartnerReport.xlsx");
+      };
 
-      ];
-      worksheet['!cols'] = [
-        { wch: 14 },
-        { wch: 20 },
-        { wch: 22 },
-        { wch: 12 },
-        { wch: 14 },
-        { wch: 18 },
-        { wch: 14 },
-        { wch: 24 },
-        { wch: 22 },
-        { wch: 20 },
-      ];
-      XLSX.utils.book_append_sheet(workbook, worksheet, "PartnerReport");
-      XLSX.writeFile(workbook, "PartnerReport.xlsx");
+      if (!isRmProfile) {
+        writePartnerReport();
+        return false;
+      }
+
+      toast.info("Fetching history. Please wait...", { autoClose: 2000 });
+      const userCodeColumnIndex = columns
+        .filter((col) => col.download !== false)
+        .findIndex((col) => col.name === "user_code");
+      const userCodes = [...new Set(
+        data
+          .map((row) => (userCodeColumnIndex >= 0 ? row.data[userCodeColumnIndex] : ""))
+          .filter(Boolean)
+      )];
+
+      Promise.all(userCodes.map(async (userCode) => {
+        const partner = dataList?.find((item) => item?.user_code === userCode);
+        try {
+          const history = await fetchLeadHistory(partner?.cpl_id);
+          return [userCode, history];
+        } catch (error) {
+          return [userCode, []];
+        }
+      }))
+        .then((entries) => {
+          writePartnerReport(Object.fromEntries(entries));
+          toast.success("Download completed!", { autoClose: 2000 });
+        })
+        .catch(() => {
+          toast.error("Error downloading file", { autoClose: 2500 });
+        });
       return false;
     }
   };
@@ -2053,6 +2108,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                 <option value="CALL">CALL</option>
                 <option value="FOLLOW UP">FOLLOW UP</option>
                 <option value="VISIT">VISIT</option>
+                <option value="NOT INTERESTED">NOT INTERESTED</option>
               </Form.Control>
             </Form.Group>
             {(visitForm.stage === "CALL" || visitForm.stage === "FOLLOW UP" || visitForm.stage === "VISIT") && (

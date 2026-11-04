@@ -260,8 +260,20 @@ const VisitsScreen = () => {
 
     const handleVisitTypeChange = (type) => {
       setCookie("VisitTypeTab", type);
+      setCookie("activeLink", type === "cp" ? "/partner/CpVisits" : "/partner/Visits");
       setVisitType(type);
+      router.push(`/partner/Visits?type=${type}`, undefined, { shallow: true });
     };
+
+    useEffect(() => {
+      if (!router.isReady) return;
+      const type = router.query.type;
+      if (type !== "client" && type !== "cp") return;
+      if (Number(userInfoCheck?.role_id) === 1 && type !== "client") return;
+      if ((isRmRole(userInfoCheck?.role_id) || isBstRole(userInfoCheck?.role_id)) && type !== "cp") return;
+      setCookie("VisitTypeTab", type);
+      setVisitType((current) => (current === type ? current : type));
+    }, [router.isReady, router.query.type]);
 
     const fetchVisitData = (filterParams) => {
       if (visitType === "cp") {

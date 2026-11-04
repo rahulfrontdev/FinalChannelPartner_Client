@@ -189,6 +189,7 @@ const AddUserScreen = () => {
         dep_id: data2?.dep_id,
         des_id: data2?.des_id,
         report_to: data1?.report_to,
+        group: data1?.group ?? data2?.group,
         aadhar_no: data2?.aadhar_no,
         pan_no: data2?.pan_no,
         dl_no: data2?.dl_no,
