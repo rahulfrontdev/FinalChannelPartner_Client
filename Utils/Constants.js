@@ -19,11 +19,19 @@
 
 /* -----------------NK Realtors links------------- */
 // Production
-export const Baseurl = 'https://admin.theprosperity.in/api/v1';
-export const filesUrl = 'https://admin.theprosperity.in/images';
+// export const Baseurl = 'https://admin.theprosperity.in/api/v1';
+// export const filesUrl = 'https://admin.theprosperity.in/images';
 
-// export const Baseurl = 'http://18.61.222.249:8051/api/v1';
-// export const filesUrl = 'http://18.61.222.249:8051/images';
+// export const Baseurl = 'http://18.61.222.249:8050/api/v1';
+// export const filesUrl = 'http://18.61.222.249:8050/images';
+
+
+
+// Sandbox
+export const Baseurl = 'http://18.61.246.105:8050/api/v1';
+export const filesUrl = 'http://18.61.246.105:8050/images';
+
+
 
 // Local
 // export const Baseurl = 'http://localhost:8050/api/v1';
