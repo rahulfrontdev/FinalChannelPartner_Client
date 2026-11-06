@@ -28,8 +28,8 @@
 
 
 // Sandbox
-export const Baseurl = 'http://18.61.246.105:8050/api/v1';
-export const filesUrl = 'http://18.61.246.105:8050/images';
+export const Baseurl = 'http://18.61.246.105/api/v1';
+export const filesUrl = 'http://18.61.246.105/images';
 
 
 
