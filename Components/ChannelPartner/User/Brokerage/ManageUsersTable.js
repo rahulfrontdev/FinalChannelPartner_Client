@@ -228,7 +228,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
   };
 
   const updateBrokerageBill = async () => {
-    if (updateBill?.status == "Payment Rejected" && updateBill?.reject_remark == "") {
+    if ((updateBill?.status == "Payment Rejected" || updateBill?.status == "Bill Rejected") && updateBill?.reject_remark == "") {
       return toast.warning("Please Enter Reject Remark", { autoClose: 2500 })
     }
     if (!hasCookie("token")) return;
@@ -504,7 +504,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
     },
   ];
 
-  let statusArray = [{ id: "", label: "All" }, { id: "Payment Initiated", label: "Payment Initiated" }, { id: "Payment Received", label: "Payment Received" }, { id: "Payment Rejected", label: "Payment Rejected" }, { id: "Bill sent", label: "Bill Received" }]
+  let statusArray = [{ id: "", label: "All" }, { id: "Payment Initiated", label: "Payment Initiated" }, { id: "Payment Received", label: "Payment Received" }, { id: "Payment Rejected", label: "Payment Rejected" }, { id: "Bill sent", label: "Bill Received" }, { id: "Bill Rejected", label: "Bill Rejected" }]
 
   const CustomToolbar = () => {
     return (
@@ -745,9 +745,11 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                 (roleId !== 2) &&
                 (
                   <img
-                    className=' cursor-pointer'
+                    className={roleId === 1 && updateBill?.status !== "Bill Rejected" ? "" : "cursor-pointer"}
                     src="/ChannelPartner/profile-edit.svg"
+                    style={roleId === 1 && updateBill?.status !== "Bill Rejected" ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
                     onClick={() => {
+                      if (roleId === 1 && updateBill?.status !== "Bill Rejected") return;
                       setShowModal(false)
                       setShowModal2(true)
                     }}
@@ -834,7 +836,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                                   </a>
                                 </div>
                                 {
-                                  updateBill?.status === "Payment Rejected" ? (
+                                  (updateBill?.status === "Payment Rejected" || updateBill?.status === "Bill Rejected") ? (
                                     <div className="rowTab">
                                       <div className="labels">
                                         <label htmlFor="name" className="pb-1">Reject Remark</label>
@@ -851,8 +853,10 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                                     <button
                                       type="button"
                                       className="btn text-white"
-                                      style={{ background: "red" }}
+                                      style={{ background: roleId === 1 && updateBill?.status !== "Bill Rejected" ? "#9C9AA5" : "red" }}
+                                      disabled={roleId === 1 && updateBill?.status !== "Bill Rejected"}
                                       onClick={() => {
+                                        if (roleId === 1 && updateBill?.status !== "Bill Rejected") return;
                                         setShowModal(false);
                                         setShowModal2(true);
                                       }}
@@ -968,10 +972,12 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                                         setUpdateBill({
                                           ...updateBill,
                                           status: e.target.value
-                                        }); e.target.value === 'Payment Rejected' ? setRejectRemark(true) : setRejectRemark(false)
+                                        }); e.target.value === 'Payment Rejected' || e.target.value === 'Bill Rejected' ? setRejectRemark(true) : setRejectRemark(false)
                                       }}
                                     >
                                       <option className="dropdown-item" >Bill Received
+                                      </option>
+                                      <option className="dropdown-item" >Bill Rejected
                                       </option>
                                       <option className="dropdown-item" >Payment Initiated
                                       </option>
@@ -1062,7 +1068,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
                                 </div>
                                 {
                                   // rejectRemark && (
-                                  updateBill?.status === 'Payment Rejected' && (
+                                  (updateBill?.status === 'Payment Rejected' || updateBill?.status === 'Bill Rejected') && (
                                     <div className="rowTab mt-3 mt-md-4 mt-lg-0">
                                       <div className="labels">
                                         <label htmlFor="Location" className="pb-1">Remark</label>

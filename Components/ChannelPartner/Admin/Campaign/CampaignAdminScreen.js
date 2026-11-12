@@ -53,6 +53,9 @@ const CampaignAdminScreen = () => {
   const projectFilesInputRef = useRef(null);
   const kitLogoInputRef = useRef(null);
   const kitFormRef = useRef(null);
+  const [kitDeleteTarget, setKitDeleteTarget] = useState(null);
+  const [confirmCampaignDelete, setConfirmCampaignDelete] = useState(false);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
 
   const PROJECT_FILE_ACCEPT =
     ".mp4,.webm,.mov,.ppt,.pptx,.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx";
@@ -190,6 +193,98 @@ const CampaignAdminScreen = () => {
     setKitLogoPreview("");
     if (projectFilesInputRef.current) projectFilesInputRef.current.value = "";
     if (kitLogoInputRef.current) kitLogoInputRef.current.value = "";
+  };
+
+  const latestKits = (kits) => {
+    const sorted = [...kits].sort((a, b) => Number(b.kit_id) - Number(a.kit_id));
+    const seen = new Set();
+    return sorted.filter((kit) => {
+      const key = String(kit.file_name || "").trim().toLowerCase();
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const kitsForProject = (projectId, source = digitalKits) =>
+    latestKits(source.filter((kit) => String(kit.project_id) === String(projectId)));
+
+  const openKitDelete = (project) => {
+    setConfirmCampaignDelete(false);
+    setKitDeleteTarget({
+      project,
+      kits: kitsForProject(project?.project_id),
+      details: kitDetailsForProject(project?.project_id),
+    });
+  };
+
+  const closeKitDelete = () => {
+    setKitDeleteTarget(null);
+    setConfirmCampaignDelete(false);
+  };
+
+  const refreshKitsAfterDelete = async (projectId, closeWhenEmpty) => {
+    const response = await axios.get(`${Baseurl}/db/channel/digital-kit`, authHeader());
+    const kits = response?.data?.data || [];
+    setDigitalKits(kits);
+    const projectKits = kitsForProject(projectId, kits);
+    if (closeWhenEmpty || !projectKits.length) {
+      closeKitDelete();
+      return;
+    }
+    const detailsSource = projectKits;
+    setKitDeleteTarget((prev) =>
+      prev
+        ? {
+            ...prev,
+            kits: projectKits,
+            details: {
+              contact: detailsSource.find((kit) => kit.contact_detail)?.contact_detail || "",
+              rera: detailsSource.find((kit) => kit.rera_number)?.rera_number || "",
+              logoUrl: detailsSource.find((kit) => kit.logo_url)?.logo_url || "",
+            },
+          }
+        : prev
+    );
+  };
+
+  const deleteKitFile = async (kit) => {
+    const projectId = kitDeleteTarget?.project?.project_id;
+    if (!kit?.kit_id || !hasCookie("token")) return;
+    const fileName = String(kit.file_name || "").trim().toLowerCase();
+    const matches = digitalKits.filter(
+      (row) =>
+        String(row.project_id) === String(projectId) &&
+        String(row.file_name || "").trim().toLowerCase() === fileName
+    );
+    const targets = matches.length ? matches : [kit];
+    try {
+      await Promise.all(
+        targets.map((row) =>
+          axios.delete(`${Baseurl}/db/channel/digital-kit/file/${row.kit_id}`, authHeader())
+        )
+      );
+      toast.success("File deleted", { autoClose: 2500 });
+      await refreshKitsAfterDelete(projectId, false);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Could not delete file", { autoClose: 3000 });
+    }
+  };
+
+  const deleteKitCampaign = async () => {
+    const projectId = kitDeleteTarget?.project?.project_id;
+    if (!projectId || !hasCookie("token")) return;
+    try {
+      await axios.delete(
+        `${Baseurl}/db/channel/digital-kit/campaign/${projectId}`,
+        authHeader()
+      );
+      toast.success("Campaign deleted", { autoClose: 2500 });
+      await refreshKitsAfterDelete(projectId, true);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Could not delete campaign", { autoClose: 3000 });
+    }
   };
 
   const startEditKit = (projectId) => {
@@ -1060,17 +1155,43 @@ const CampaignAdminScreen = () => {
                                   return (
                                     <div className="d-flex align-items-center gap-3 mb-3">
                                       {details.logoUrl ? (
-                                        <span style={{ width: 48, height: 48, overflow: "hidden", flexShrink: 0, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", padding: 4 }}>
+                                        <button
+                                          type="button"
+                                          title="View logo"
+                                          onClick={() => setLogoPreviewUrl(details.logoUrl)}
+                                          style={{
+                                            width: 88,
+                                            height: 88,
+                                            flexShrink: 0,
+                                            position: "relative",
+                                            borderRadius: 8,
+                                            background: "#fff",
+                                            border: "1px solid #eee",
+                                            overflow: "hidden",
+                                            padding: 0,
+                                            cursor: "pointer",
+                                          }}
+                                        >
                                           <img
                                             src={details.logoUrl}
                                             alt="Property logo"
-                                            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                                            style={{
+                                              position: "absolute",
+                                              top: 6,
+                                              right: 6,
+                                              bottom: 6,
+                                              left: 6,
+                                              width: "calc(100% - 12px)",
+                                              height: "calc(100% - 12px)",
+                                              objectFit: "contain",
+                                              objectPosition: "center",
+                                            }}
                                           />
-                                        </span>
+                                        </button>
                                       ) : (
                                         <div
                                           className="d-flex align-items-center justify-content-center text-muted"
-                                          style={{ width: 48, height: 48, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", fontSize: 10, textAlign: "center", flexShrink: 0, lineHeight: 1.1 }}
+                                          style={{ width: 88, height: 88, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", fontSize: 10, textAlign: "center", flexShrink: 0, lineHeight: 1.1 }}
                                         >
                                           No logo
                                         </div>
@@ -1080,31 +1201,45 @@ const CampaignAdminScreen = () => {
                                         <div className="text-muted text-truncate" style={{ fontSize: 12 }}>{details.contact ? `Phone number ${details.contact}` : "No phone number"}</div>
                                         <div className="text-muted text-truncate" style={{ fontSize: 12 }}>{details.rera ? `RERA number ${details.rera}` : "No RERA number"}</div>
                                       </div>
-                                      <button
-                                        type="button"
-                                        className="btn flex-shrink-0"
-                                        style={{
-                                          color: clientBtnColor,
-                                          border: `1px solid ${clientBtnColor}`,
-                                          background: "transparent",
-                                          height: 28,
-                                          fontSize: 12,
-                                          padding: "2px 10px",
-                                          borderRadius: 6,
-                                        }}
-                                        onClick={() => startEditKit(project?.project_id)}
-                                      >
-                                        Edit
-                                      </button>
+                                      <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                                        <button
+                                          type="button"
+                                          className="btn flex-shrink-0"
+                                          style={{
+                                            color: clientBtnColor,
+                                            border: `1px solid ${clientBtnColor}`,
+                                            background: "transparent",
+                                            height: 28,
+                                            fontSize: 12,
+                                            padding: "2px 10px",
+                                            borderRadius: 6,
+                                          }}
+                                          onClick={() => startEditKit(project?.project_id)}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn flex-shrink-0"
+                                          style={{
+                                            color: "#d32f2f",
+                                            border: "1px solid #d32f2f",
+                                            background: "transparent",
+                                            height: 28,
+                                            fontSize: 12,
+                                            padding: "2px 10px",
+                                            borderRadius: 6,
+                                          }}
+                                          onClick={() => openKitDelete(project)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })()}
                                 <div className="d-flex flex-column gap-1">
-                                  {digitalKits
-                                    .filter((kit) => String(kit.project_id) === String(project.project_id))
-                                    .sort((a, b) => Number(b.kit_id) - Number(a.kit_id))
-                                    .slice(0, 2)
-                                    .map((item) => (
+                                  {kitsForProject(project?.project_id).map((item) => (
                                           <div
                                             key={item.kit_id}
                                             className="d-flex align-items-center justify-content-between rounded px-3 py-2 gap-2"
@@ -1166,6 +1301,95 @@ const CampaignAdminScreen = () => {
           )
       }
 
+
+      <Modal show={!!logoPreviewUrl} onHide={() => setLogoPreviewUrl("")} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: 16 }}>Property logo</Modal.Title>
+        </Modal.Header>
+        <Modal.Body
+          className="d-flex align-items-center justify-content-center"
+          style={{ minHeight: 280 }}
+        >
+          <img
+            src={logoPreviewUrl}
+            alt="Property logo"
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: "70vh",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              margin: "0 auto",
+            }}
+          />
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={!!kitDeleteTarget} onHide={closeKitDelete} centered>
+        <Modal.Body>
+          <div className="d-flex flex-column gap-3 p-3">
+            <div className="text-center fs-5" style={{ color: clientBtnColor }}>
+              Delete Digital Kit
+            </div>
+            <div className="text-center text-muted" style={{ fontSize: 14 }}>
+              {kitDeleteTarget?.project?.project}
+            </div>
+            <div className="d-flex flex-column gap-2">
+              <div className="fw-semibold" style={{ fontSize: 14 }}>Delete file</div>
+              {!kitDeleteTarget?.kits?.length && (
+                <small className="text-muted">No files uploaded.</small>
+              )}
+              {kitDeleteTarget?.kits?.map((item) => (
+                <div
+                  key={item.kit_id}
+                  className="d-flex align-items-center justify-content-between gap-2 border rounded px-2 py-2"
+                >
+                  <div className="overflow-hidden">
+                    <div className="text-truncate" title={item.file_name}>{item.file_name}</div>
+                    <small className="text-muted">{item.kind}</small>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm flex-shrink-0"
+                    style={{ color: "#d32f2f", border: "1px solid #d32f2f", background: "#fff" }}
+                    onClick={() => deleteKitFile(item)}
+                  >
+                    Delete file
+                  </button>
+                </div>
+              ))}
+            </div>
+            {confirmCampaignDelete ? (
+              <div className="border rounded p-3 d-flex flex-column gap-2">
+                <div style={{ fontSize: 14 }}>
+                  Delete the entire campaign, including logo, phone, RERA and all files?
+                </div>
+                <div className="d-flex justify-content-end gap-2">
+                  <button type="button" className="btn btn-sm btn-light" onClick={() => setConfirmCampaignDelete(false)}>
+                    Cancel
+                  </button>
+                  <button type="button" className="btn btn-sm text-white" style={{ background: "#d32f2f" }} onClick={deleteKitCampaign}>
+                    Delete campaign
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn text-white"
+                style={{ background: "#d32f2f" }}
+                onClick={() => setConfirmCampaignDelete(true)}
+              >
+                Delete entire campaign
+              </button>
+            )}
+            <button type="button" className="btn btn-light" onClick={closeKitDelete}>
+              Close
+            </button>
+          </div>
+        </Modal.Body>
+      </Modal>
 
       <Modal
         show={showModal}
