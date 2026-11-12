@@ -42,6 +42,7 @@ const CampaignScreen = () => {
   const [reraDraft, setReraDraft] = useState("");
   const [pendingLogoFile, setPendingLogoFile] = useState(null);
   const [pendingLogoPreview, setPendingLogoPreview] = useState("");
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
   const kitLogoInputRef = useRef(null);
   const dispatch=useDispatch()
   const {isButtonLoading}=useSelector((state)=>state.buttonLoader)
@@ -93,6 +94,20 @@ const CampaignScreen = () => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const latestKitsForProject = (projectId) => {
+    const sorted = digitalKits
+      .filter((kit) => String(kit.project_id) === String(projectId))
+      .sort((a, b) => Number(b.kit_id) - Number(a.kit_id));
+    const seen = new Set();
+    return sorted.filter((kit) => {
+      const key = String(kit.file_name || "").trim().toLowerCase();
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   };
 
   const kitDetailsForProject = (projectId) => {
@@ -662,17 +677,43 @@ const CampaignScreen = () => {
                       return (
                         <div className="d-flex align-items-center gap-3 mb-3">
                           {logoSrc ? (
-                            <span style={{ width: 48, height: 48, overflow: "hidden", flexShrink: 0, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", padding: 4 }}>
+                            <button
+                              type="button"
+                              title="View logo"
+                              onClick={() => setLogoPreviewUrl(logoSrc)}
+                              style={{
+                                width: 88,
+                                height: 88,
+                                flexShrink: 0,
+                                position: "relative",
+                                borderRadius: 8,
+                                background: "#fff",
+                                border: "1px solid #eee",
+                                overflow: "hidden",
+                                padding: 0,
+                                cursor: "pointer",
+                              }}
+                            >
                               <img
                                 src={logoSrc}
                                 alt="Property logo"
-                                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  right: 6,
+                                  bottom: 6,
+                                  left: 6,
+                                  width: "calc(100% - 12px)",
+                                  height: "calc(100% - 12px)",
+                                  objectFit: "contain",
+                                  objectPosition: "center",
+                                }}
                               />
-                            </span>
+                            </button>
                           ) : (
                             <div
                               className="d-flex align-items-center justify-content-center text-muted"
-                              style={{ width: 48, height: 48, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", fontSize: 10, textAlign: "center", flexShrink: 0, lineHeight: 1.1 }}
+                              style={{ width: 88, height: 88, borderRadius: 8, background: "#F7F7F7", border: "1px solid #eee", fontSize: 10, textAlign: "center", flexShrink: 0, lineHeight: 1.1 }}
                             >
                               No logo
                             </div>
@@ -760,11 +801,7 @@ const CampaignScreen = () => {
                       );
                     })()}
                     <div className="d-flex flex-column gap-2">
-                      {digitalKits
-                        .filter((kit) => String(kit.project_id) === String(project.project_id))
-                        .sort((a, b) => Number(b.kit_id) - Number(a.kit_id))
-                        .slice(0, 2)
-                        .map((item) => (
+                      {latestKitsForProject(project.project_id).map((item) => (
                           <div
                             key={item.kit_id}
                             className="d-flex align-items-center justify-content-between rounded px-3 py-2 gap-2"
@@ -821,6 +858,30 @@ const CampaignScreen = () => {
       )
     }
       
+
+      <Modal show={!!logoPreviewUrl} onHide={() => setLogoPreviewUrl("")} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: 16 }}>Property logo</Modal.Title>
+        </Modal.Header>
+        <Modal.Body
+          className="d-flex align-items-center justify-content-center"
+          style={{ minHeight: 280 }}
+        >
+          <img
+            src={logoPreviewUrl}
+            alt="Property logo"
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: "70vh",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              margin: "0 auto",
+            }}
+          />
+        </Modal.Body>
+      </Modal>
 
       <Modal
         show={showModal}
@@ -1064,3 +1125,5 @@ const CampaignScreen = () => {
 };
 
 export default CampaignScreen;
+
+
