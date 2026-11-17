@@ -175,7 +175,7 @@ const ActivePartnersScreen = () => {
                     end.setHours(23, 59, 59, 999);
                     if (isNaN(start.getTime()) || isNaN(end.getTime())) return users;
                     return users.filter((u) => {
-                        const raw = u?.createdAt || u?.created_at || u?.created_date;
+                        const raw = u?.onboarding_date || u?.createdAt || u?.created_at || u?.created_date;
                         if (!raw) return false;
                         const d = new Date(raw);
                         if (isNaN(d.getTime())) return false;
