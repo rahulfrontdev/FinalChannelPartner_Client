@@ -7,7 +7,11 @@ import '../styles/channelstyles.css'
 import { store } from '../store/store'
 import { Provider } from 'react-redux'
 import { SSRProvider } from 'react-bootstrap';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+
+const showErrorToast = toast.error.bind(toast);
+toast.error = (message, options) =>
+  showErrorToast(message, { ...(options || {}), autoClose: 8000 });
 import 'react-toastify/dist/ReactToastify.css';
 import Layout from '../Components/layout/layout';
 import Tabs from '../Components/DMS/Tabs/Tabs';

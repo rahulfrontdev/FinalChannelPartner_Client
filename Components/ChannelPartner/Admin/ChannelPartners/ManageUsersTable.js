@@ -1020,7 +1020,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
       }
     },
     {
-      name: 'createdAt',
+      name: 'onboarding_date',
       label: "Created Date",
       options: {
         filter: false,
@@ -1514,7 +1514,7 @@ const ManageUsersTable = ({ start, end, deleteConfirm, disableConfirm, dataList,
 
       if (cell == null || cell === '') continue;
 
-      if (colName === 'createdAt') {
+      if (colName === 'onboarding_date') {
         if (matchDateSearch(cell, searchQuery)) return true;
         continue;
       }
