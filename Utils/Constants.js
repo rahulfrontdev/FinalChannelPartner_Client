@@ -19,8 +19,8 @@
 
 /* -----------------NK Realtors links------------- */
 // Production
-// export const Baseurl = 'https://admin.theprosperity.in/api/v1';
-// export const filesUrl = 'https://admin.theprosperity.in/images';
+export const Baseurl = 'https://admin.theprosperity.in/api/v1';
+export const filesUrl = 'https://admin.theprosperity.in/images';
 
 // export const Baseurl = 'http://18.61.222.249:8050/api/v1';
 // export const filesUrl = 'http://18.61.222.249:8050/images';
@@ -28,12 +28,12 @@
 
 
 // Sandbox
-export const Baseurl = 'http://18.61.246.105/api/v1';
-export const filesUrl = 'http://18.61.246.105/images';
+// export const Baseurl = 'http://18.61.246.105/api/v1';
+// export const filesUrl = 'http://18.61.246.105/images';
 
 
 
-// Local
+// // Local
 // export const Baseurl = 'http://localhost:8050/api/v1';
 // export const filesUrl = 'http://localhost:8050/images';
 /** Registered tenant URL for /db/admin/url and login client_url (use on localhost too) */

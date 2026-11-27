@@ -1,6 +1,6 @@
 import React from 'react'
 import ChannelPartnerHOC from '../HOC/ChannelPartnerHOC'
-import ChannelPartnerRegister_NextScreen from '../Components/ChannelPartner/ChannelPartnerRegister/ChannelPartnerRegister_NextScreen'
+import ChannelPartnerRegister_NextScreen from '../Claude outputs/ChannelPartnerRegister_NextScreen'
 
 const ChannelPartnerRegister_Next = () => {
   return (
