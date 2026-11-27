@@ -25,26 +25,29 @@
 }
 /* Channel register end */
 
-/* Channel partner register: next screen (mobile first) */
+/* Channel partner register: next screen ("documents under verification") */
 
-/* Base = phones */
+/* Tablet and desktop: centred card with a readable maximum width */
 .cp-next {
   width: 100%;
   max-width: 100%;
-  padding: 16px 12px;
+  padding: 32px 24px;
   box-sizing: border-box;
 }
 
 .cp-next__card {
   width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .cp-next__header {
-  padding: 20px 16px 14px;
+  padding: 24px 32px 16px;
   border-bottom: 1px solid #eeeeee;
   text-align: center;
 }
@@ -58,14 +61,15 @@
 
 .cp-next__title {
   margin: 8px 0 0;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.35;
   color: #26203b;
+  overflow-wrap: anywhere;
 }
 
 .cp-next__body {
-  padding: 16px;
+  padding: 24px 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -76,57 +80,61 @@
   font-size: 14px;
   line-height: 1.5;
   color: #6c757d;
+  overflow-wrap: anywhere;
 }
 
 .cp-next__image {
   display: block;
   width: 100%;
+  max-width: 480px;
   height: auto;
-  max-height: 60vh;
+  margin: 0 auto;
   object-fit: contain;
   border-radius: 12px;
 }
 
 .cp-next__button {
-  width: 100%;
+  align-self: center;
+  min-width: 220px;
   padding: 10px 16px;
   font-weight: 600;
   color: #212529;
 }
 
-/* Tablets */
-@media (min-width: 768px) {
+/* Phones and the React Native WebView: full-width, edge-to-edge */
+@media (max-width: 767px) {
   .cp-next {
-    padding: 24px 32px;
+    padding: 0;
+  }
+
+  .cp-next__card {
+    max-width: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .cp-next__header {
-    padding: 24px 32px 16px;
+    padding: 20px 16px 14px;
   }
 
   .cp-next__title {
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .cp-next__body {
-    padding: 24px 32px;
-  }
-
-  .cp-next__button {
-    width: auto;
-    min-width: 220px;
-    align-self: center;
-  }
-}
-
-/* Laptops and up: card spans the full width */
-@media (min-width: 992px) {
-  .cp-next {
-    padding: 32px 48px;
+    padding: 16px;
   }
 
   .cp-next__image {
-    max-height: 480px;
+    max-width: 100%;
+    max-height: 55vh;
+  }
+
+  .cp-next__button {
+    align-self: stretch;
+    min-width: 0;
   }
 }
 
@@ -1226,14 +1234,3 @@
 }
 
 /* lead visit request hover end */
-
-.cp-next,
-.cp-next--edge {
-  padding: 0;
-}
-
-.cp-next__card {
-  border-radius: 0;
-  box-shadow: none;
-  min-height: 100vh;
-}
